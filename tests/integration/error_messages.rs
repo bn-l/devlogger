@@ -1,0 +1,111 @@
+use super::common::{main_devlog, run, run_ok};
+
+#[test]
+fn numeric_section_name_error_mentions_the_bad_char() {
+    let dir = tempfile::tempdir().unwrap();
+    let (code, _, stderr) = run(dir.path(), &["new", "5", "nope"]);
+    assert_ne!(code, 0);
+    assert!(stderr.contains("invalid section name '5'"), "stderr: {stderr}");
+    assert!(stderr.contains("illegal character '5'"), "stderr: {stderr}");
+}
+
+#[test]
+fn uppercase_section_name_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let (code, _, stderr) = run(dir.path(), &["list", "Backend"]);
+    assert_ne!(code, 0);
+    assert!(stderr.contains("illegal character 'B'"), "stderr: {stderr}");
+}
+
+#[test]
+fn leading_hyphen_section_name_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let (code, _, stderr) = run(dir.path(), &["list", "-foo"]);
+    assert_ne!(code, 0);
+    // clap may interpret -foo as a flag — assert *some* error, and that
+    // the specific message surfaces for the double-dash escape form.
+    assert!(!stderr.is_empty());
+
+    let (code2, _, stderr2) = run(dir.path(), &["list", "--", "-foo"]);
+    assert_ne!(code2, 0);
+    assert!(
+        stderr2.contains("must not start with '-'") || stderr2.contains("invalid section"),
+        "stderr: {stderr2}"
+    );
+}
+
+#[test]
+fn trailing_hyphen_section_name_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let (code, _, stderr) = run(dir.path(), &["list", "foo-"]);
+    assert_ne!(code, 0);
+    assert!(stderr.contains("must not end with '-'"), "stderr: {stderr}");
+}
+
+#[test]
+fn consecutive_hyphens_section_name_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let (code, _, stderr) = run(dir.path(), &["new", "a--b", "x"]);
+    assert_ne!(code, 0);
+    assert!(stderr.contains("consecutive hyphens"), "stderr: {stderr}");
+}
+
+#[test]
+fn parse_error_is_single_line_with_path_and_line_number() {
+    let dir = tempfile::tempdir().unwrap();
+    // Seed a valid main devlog, then corrupt it.
+    run_ok(dir.path(), &["new", "ok"]);
+    let path = main_devlog(dir.path());
+    let mut contents = std::fs::read_to_string(&path).unwrap();
+    contents.push_str("- this is broken\n");
+    std::fs::write(&path, &contents).unwrap();
+
+    let (code, _, stderr) = run(dir.path(), &["list"]);
+    assert_ne!(code, 0);
+    assert!(stderr.contains(&path.display().to_string()), "stderr: {stderr}");
+    assert!(stderr.contains(":3:") || stderr.contains(":2:"), "should include line number: {stderr}");
+    assert!(stderr.contains("expected `- <number> | "), "should describe the format: {stderr}");
+}
+
+#[test]
+fn parse_error_does_not_dump_file_contents_via_cli() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = main_devlog(dir.path());
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    // A file with an obvious "secret" we should NOT see echoed back.
+    std::fs::write(
+        &path,
+        "SENTINEL_SECRET_aaa\nline two prose\n- totally broken line\nSENTINEL_SECRET_bbb\n",
+    )
+    .unwrap();
+
+    let (code, _, stderr) = run(dir.path(), &["list"]);
+    assert_ne!(code, 0);
+    assert!(!stderr.contains("SENTINEL_SECRET_aaa"), "file content leaked: {stderr}");
+    assert!(!stderr.contains("SENTINEL_SECRET_bbb"), "file content leaked: {stderr}");
+    assert!(!stderr.contains("totally broken line"), "raw line leaked: {stderr}");
+    // Should be short and single-line (plus the `devlogger: ` prefix + newline).
+    assert!(stderr.lines().count() <= 2, "error should be concise: {stderr}");
+}
+
+#[test]
+fn parse_error_on_read_also_surfaces() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = main_devlog(dir.path());
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, "- 1 | bogus-date: text\n").unwrap();
+
+    let (code, _, stderr) = run(dir.path(), &["read", "1"]);
+    assert_ne!(code, 0);
+    assert!(stderr.contains("YYYY-MM-DD HH:MM:SS"), "stderr: {stderr}");
+}
+
+#[test]
+fn update_fails_on_invalid_n_format() {
+    // `read` with 2 args where the second isn't a number.
+    let dir = tempfile::tempdir().unwrap();
+    run_ok(dir.path(), &["new", "backend", "x"]);
+    let (code, _, stderr) = run(dir.path(), &["read", "backend", "notnum"]);
+    assert_ne!(code, 0);
+    assert!(stderr.contains("non-negative integer"), "stderr: {stderr}");
+}
