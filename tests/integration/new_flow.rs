@@ -1,4 +1,4 @@
-use super::common::{bin, count_entries, main_devlog, run, run_err, run_ok, section_devlog};
+use super::common::{bin, count_entries, run, run_err, run_ok, section_devlog};
 
 #[test]
 fn first_new_creates_devlog_directory_and_file() {
@@ -6,16 +6,19 @@ fn first_new_creates_devlog_directory_and_file() {
     let base = dir.path();
     assert!(!base.join("DEVLOG").exists());
 
-    run_ok(base, &["new", "first entry"]);
+    run_ok(base, &["new", "main", "first entry"]);
 
     assert!(base.join("DEVLOG").exists(), "DEVLOG dir should be created");
-    assert!(main_devlog(base).exists(), "main-devlog.md should be created");
+    assert!(
+        section_devlog(base, "main").exists(),
+        "main section devlog should be created"
+    );
 }
 
 #[test]
 fn first_entry_numbered_one() {
     let dir = tempfile::tempdir().unwrap();
-    let stdout = run_ok(dir.path(), &["new", "hello"]);
+    let stdout = run_ok(dir.path(), &["new", "main", "hello"]);
     assert!(stdout.starts_with("- 1 | "), "first entry should be #1: {stdout}");
     assert!(stdout.trim_end().ends_with(": hello"));
 }
@@ -23,12 +26,13 @@ fn first_entry_numbered_one() {
 #[test]
 fn sequential_numbering() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "one"]);
-    run_ok(dir.path(), &["new", "two"]);
-    run_ok(dir.path(), &["new", "three"]);
+    run_ok(dir.path(), &["new", "main", "one"]);
+    run_ok(dir.path(), &["new", "main", "two"]);
+    run_ok(dir.path(), &["new", "main", "three"]);
 
-    let contents = std::fs::read_to_string(main_devlog(dir.path())).unwrap();
-    assert_eq!(count_entries(&main_devlog(dir.path())), 3);
+    let path = section_devlog(dir.path(), "main");
+    let contents = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(count_entries(&path), 3);
     assert!(contents.contains("- 1 | "));
     assert!(contents.contains("- 2 | "));
     assert!(contents.contains("- 3 | "));
@@ -37,10 +41,10 @@ fn sequential_numbering() {
 #[test]
 fn each_entry_on_its_own_line() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "one"]);
-    run_ok(dir.path(), &["new", "two"]);
+    run_ok(dir.path(), &["new", "main", "one"]);
+    run_ok(dir.path(), &["new", "main", "two"]);
 
-    let contents = std::fs::read_to_string(main_devlog(dir.path())).unwrap();
+    let contents = std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
     let entry_lines: Vec<&str> = contents.lines().filter(|l| l.starts_with("- ")).collect();
     assert_eq!(entry_lines.len(), 2);
 }
@@ -48,16 +52,16 @@ fn each_entry_on_its_own_line() {
 #[test]
 fn entry_text_with_colons_survives_round_trip() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "deploy: staging"]);
-    let listing = run_ok(dir.path(), &["list"]);
+    run_ok(dir.path(), &["new", "main", "deploy: staging"]);
+    let listing = run_ok(dir.path(), &["list", "main"]);
     assert!(listing.contains(": deploy: staging"), "got: {listing}");
 }
 
 #[test]
 fn entry_text_with_pipes_survives_round_trip() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "left | right"]);
-    let listing = run_ok(dir.path(), &["list"]);
+    run_ok(dir.path(), &["new", "main", "left | right"]);
+    let listing = run_ok(dir.path(), &["list", "main"]);
     assert!(listing.contains("left | right"), "got: {listing}");
 }
 
@@ -72,14 +76,15 @@ fn section_new_creates_section_subdir() {
 }
 
 #[test]
-fn section_numbering_is_independent_from_main() {
+fn section_numbering_is_independent() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "main one"]);
-    run_ok(dir.path(), &["new", "main two"]);
+    run_ok(dir.path(), &["new", "main", "main one"]);
+    run_ok(dir.path(), &["new", "main", "main two"]);
     run_ok(dir.path(), &["new", "backend", "back one"]);
 
-    // Main has 2 entries starting at 1; backend has 1 entry starting at 1.
-    let main_contents = std::fs::read_to_string(main_devlog(dir.path())).unwrap();
+    // main has 2 entries starting at 1; backend has 1 entry starting at 1.
+    let main_contents =
+        std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
     let back_contents =
         std::fs::read_to_string(section_devlog(dir.path(), "backend")).unwrap();
     assert!(main_contents.contains("- 1 | "));
@@ -95,20 +100,20 @@ fn new_without_dash_f_uses_cwd() {
     let dir = tempfile::tempdir().unwrap();
     let output = std::process::Command::new(bin())
         .current_dir(dir.path())
-        .args(["new", "cwd entry"])
+        .args(["new", "main", "cwd entry"])
         .output()
         .unwrap();
     assert!(output.status.success(), "stderr: {:?}", String::from_utf8_lossy(&output.stderr));
-    assert!(main_devlog(dir.path()).exists());
+    assert!(section_devlog(dir.path(), "main").exists());
 }
 
 #[test]
 fn new_appends_rather_than_overwriting() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "one"]);
-    let after_one = std::fs::read_to_string(main_devlog(dir.path())).unwrap();
-    run_ok(dir.path(), &["new", "two"]);
-    let after_two = std::fs::read_to_string(main_devlog(dir.path())).unwrap();
+    run_ok(dir.path(), &["new", "main", "one"]);
+    let after_one = std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
+    run_ok(dir.path(), &["new", "main", "two"]);
+    let after_two = std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
     assert!(
         after_two.starts_with(after_one.trim_end()),
         "after=`{after_two}`, before=`{after_one}`"
@@ -129,11 +134,11 @@ fn new_reports_exhaustion_instead_of_overflowing_u32_max() {
     // next `new` must fail cleanly — not panic (debug) and not silently
     // wrap to 0 (release).
     let dir = tempfile::tempdir().unwrap();
-    let path = main_devlog(dir.path());
+    let path = section_devlog(dir.path(), "main");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(&path, "- 4294967295 | 2026-04-14 10:00:00: max\n").unwrap();
 
-    let stderr = run_err(dir.path(), &["new", "after max"]);
+    let stderr = run_err(dir.path(), &["new", "main", "after max"]);
     assert!(
         stderr.contains("numbering exhausted"),
         "stderr should mention exhaustion: {stderr}"

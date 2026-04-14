@@ -2,7 +2,7 @@ use clap::Parser;
 use devlogger::cli::{Cli, Command};
 
 #[test]
-fn list_without_args_is_main() {
+fn list_without_args_parses_as_list_all() {
     let cli = Cli::try_parse_from(["devlogger", "list"]).unwrap();
     match cli.command {
         Command::List { args } => assert!(args.is_empty()),

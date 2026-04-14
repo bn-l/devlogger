@@ -1,14 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use devlogger::section::{main_devlog_path, section_devlog_path};
+use devlogger::section::section_devlog_path;
 use devlogger::store::load_entries;
-
-#[test]
-fn main_path_is_devlog_main_devlog_md() {
-    let base = Path::new("/tmp/proj");
-    let p = main_devlog_path(base);
-    assert_eq!(p, PathBuf::from("/tmp/proj/DEVLOG/main-devlog.md"));
-}
 
 #[test]
 fn section_path_nests_section_name_twice() {

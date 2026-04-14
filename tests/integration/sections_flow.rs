@@ -21,14 +21,6 @@ fn sections_prints_created_sections_alphabetically() {
 }
 
 #[test]
-fn sections_excludes_main_devlog() {
-    let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "main entry"]);
-    let out = run_ok(dir.path(), &["sections"]);
-    assert!(out.is_empty(), "main-only project should list no sections: {out:?}");
-}
-
-#[test]
 fn sections_ignores_stray_directories() {
     let dir = tempfile::tempdir().unwrap();
     // Create a real section plus a stray subdir that looks section-y

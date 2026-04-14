@@ -45,11 +45,6 @@ pub fn validate_section_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// `<base>/DEVLOG/main-devlog.md`
-pub fn main_devlog_path(base: &Path) -> PathBuf {
-    base.join("DEVLOG").join("main-devlog.md")
-}
-
 /// `<base>/DEVLOG/<section>/<section>-devlog.md`.  The caller must have
 /// validated the section name first.
 pub fn section_devlog_path(base: &Path, section: &str) -> PathBuf {

@@ -8,21 +8,19 @@ use std::process::Command;
 use std::sync::Arc;
 use std::thread;
 
-use super::common::{bin, count_entries, main_devlog, section_devlog};
+use super::common::{bin, count_entries, section_devlog};
 
-fn spawn_many_new(base: PathBuf, count: usize, section: Option<&str>) {
+fn spawn_many_new(base: PathBuf, count: usize, section: &str) {
     let base = Arc::new(base);
-    let section = section.map(|s| s.to_string()).map(Arc::new);
+    let section = Arc::new(section.to_string());
     let mut handles = Vec::with_capacity(count);
     for i in 0..count {
         let base = Arc::clone(&base);
-        let section = section.clone();
+        let section = Arc::clone(&section);
         handles.push(thread::spawn(move || {
             let mut cmd = Command::new(bin());
             cmd.arg("-f").arg(base.as_path()).arg("new");
-            if let Some(s) = section.as_ref() {
-                cmd.arg(s.as_str());
-            }
+            cmd.arg(section.as_str());
             cmd.arg(format!("entry {i}"));
             let out = cmd.output().expect("spawn devlogger");
             assert!(
@@ -68,20 +66,20 @@ fn assert_no_merged_lines(path: &std::path::Path) {
 }
 
 #[test]
-fn twenty_parallel_new_produces_twenty_unique_numbered_entries_on_main() {
+fn twenty_parallel_new_produces_twenty_unique_numbered_entries() {
     let dir = tempfile::tempdir().unwrap();
-    spawn_many_new(dir.path().to_path_buf(), 20, None);
+    spawn_many_new(dir.path().to_path_buf(), 20, "main");
 
-    let path = main_devlog(dir.path());
+    let path = section_devlog(dir.path(), "main");
     assert_eq!(count_entries(&path), 20, "expected 20 entry lines");
     assert_distinct_numbers_one_through(&path, 20);
     assert_no_merged_lines(&path);
 }
 
 #[test]
-fn ten_parallel_new_on_a_section_also_safe() {
+fn ten_parallel_new_on_a_different_section_also_safe() {
     let dir = tempfile::tempdir().unwrap();
-    spawn_many_new(dir.path().to_path_buf(), 10, Some("backend"));
+    spawn_many_new(dir.path().to_path_buf(), 10, "backend");
 
     let path = section_devlog(dir.path(), "backend");
     assert_eq!(count_entries(&path), 10);
@@ -90,22 +88,22 @@ fn ten_parallel_new_on_a_section_also_safe() {
 }
 
 #[test]
-fn main_and_section_writers_do_not_block_each_other_into_corruption() {
-    // Parallel writers to main and to a section use different lockfiles.
-    // They should both complete cleanly; each log ends up with its own
+fn parallel_writers_to_different_sections_do_not_corrupt_each_other() {
+    // Parallel writers to two sections use different lockfiles.  They
+    // should both complete cleanly; each log ends up with its own
     // contiguous 1..N numbering.
     let dir = tempfile::tempdir().unwrap();
     let base = dir.path().to_path_buf();
 
     let b1 = base.clone();
-    let t_main = thread::spawn(move || spawn_many_new(b1, 8, None));
+    let t_a = thread::spawn(move || spawn_many_new(b1, 8, "alpha"));
     let b2 = base.clone();
-    let t_section = thread::spawn(move || spawn_many_new(b2, 8, Some("backend")));
+    let t_b = thread::spawn(move || spawn_many_new(b2, 8, "backend"));
 
-    t_main.join().unwrap();
-    t_section.join().unwrap();
+    t_a.join().unwrap();
+    t_b.join().unwrap();
 
-    assert_distinct_numbers_one_through(&main_devlog(dir.path()), 8);
+    assert_distinct_numbers_one_through(&section_devlog(dir.path(), "alpha"), 8);
     assert_distinct_numbers_one_through(&section_devlog(dir.path(), "backend"), 8);
 }
 
@@ -120,6 +118,7 @@ fn concurrent_updates_do_not_lose_writes() {
             .arg("-f")
             .arg(dir.path())
             .arg("new")
+            .arg("main")
             .arg(format!("initial {i}"))
             .output()
             .unwrap();
@@ -136,6 +135,7 @@ fn concurrent_updates_do_not_lose_writes() {
                 .arg("-f")
                 .arg(base.as_path())
                 .arg("update")
+                .arg("main")
                 .arg(&num)
                 .arg(format!("updated {i}"))
                 .output()
@@ -151,7 +151,7 @@ fn concurrent_updates_do_not_lose_writes() {
         h.join().unwrap();
     }
 
-    let contents = std::fs::read_to_string(main_devlog(dir.path())).unwrap();
+    let contents = std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
     for i in 0..n {
         let expected = format!(": updated {i}");
         assert!(
@@ -159,14 +159,6 @@ fn concurrent_updates_do_not_lose_writes() {
             "missing update {i}: file:\n{contents}"
         );
     }
-}
-
-#[test]
-fn lockfile_is_created_in_expected_location() {
-    let dir = tempfile::tempdir().unwrap();
-    super::common::run_ok(dir.path(), &["new", "x"]);
-    let lockfile = dir.path().join("DEVLOG").join(".devlogger.lock");
-    assert!(lockfile.is_file(), "expected lockfile at {}", lockfile.display());
 }
 
 #[test]
@@ -179,10 +171,11 @@ fn section_gets_its_own_lockfile() {
         .join("backend")
         .join(".devlogger.lock");
     assert!(section_lock.is_file());
-    // Main lockfile should NOT have been created for a section-only write.
-    let main_lock = dir.path().join("DEVLOG").join(".devlogger.lock");
+    // A second, unrelated section must get its own lockfile, not share
+    // one at the DEVLOG root.
+    let root_lock = dir.path().join("DEVLOG").join(".devlogger.lock");
     assert!(
-        !main_lock.exists(),
-        "main lockfile should not be created when only the section was touched"
+        !root_lock.exists(),
+        "no root-level lockfile should be created"
     );
 }

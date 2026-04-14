@@ -1,22 +1,22 @@
 //! Entry text arriving via argv must not contain characters that would
 //! break the single-line-per-entry file format.
 
-use super::common::{main_devlog, run, run_ok};
+use super::common::{run, run_ok, section_devlog};
 
 #[test]
 fn new_rejects_entry_with_newline() {
     let dir = tempfile::tempdir().unwrap();
-    let (code, _, stderr) = run(dir.path(), &["new", "line1\nline2"]);
+    let (code, _, stderr) = run(dir.path(), &["new", "main", "line1\nline2"]);
     assert_ne!(code, 0);
     assert!(stderr.contains("newline"), "stderr: {stderr}");
     // File must not have been touched.
-    assert!(!main_devlog(dir.path()).exists());
+    assert!(!section_devlog(dir.path(), "main").exists());
 }
 
 #[test]
 fn new_rejects_entry_with_carriage_return() {
     let dir = tempfile::tempdir().unwrap();
-    let (code, _, stderr) = run(dir.path(), &["new", "line1\rline2"]);
+    let (code, _, stderr) = run(dir.path(), &["new", "main", "line1\rline2"]);
     assert_ne!(code, 0);
     assert!(stderr.contains("carriage return"), "stderr: {stderr}");
 }
@@ -24,7 +24,7 @@ fn new_rejects_entry_with_carriage_return() {
 #[test]
 fn new_rejects_entry_with_crlf() {
     let dir = tempfile::tempdir().unwrap();
-    let (code, _, _) = run(dir.path(), &["new", "a\r\nb"]);
+    let (code, _, _) = run(dir.path(), &["new", "main", "a\r\nb"]);
     assert_ne!(code, 0);
 }
 
@@ -38,7 +38,7 @@ fn new_rejects_entry_with_crlf() {
 fn new_rejects_arbitrary_control_char() {
     let dir = tempfile::tempdir().unwrap();
     // ESC / 0x1B
-    let (code, _, stderr) = run(dir.path(), &["new", "a\x1bb"]);
+    let (code, _, stderr) = run(dir.path(), &["new", "main", "a\x1bb"]);
     assert_ne!(code, 0);
     assert!(stderr.contains("U+001B"), "stderr: {stderr}");
 }
@@ -46,37 +46,37 @@ fn new_rejects_arbitrary_control_char() {
 #[test]
 fn new_accepts_tab_in_entry() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "col1\tcol2"]);
-    let list = run_ok(dir.path(), &["list"]);
+    run_ok(dir.path(), &["new", "main", "col1\tcol2"]);
+    let list = run_ok(dir.path(), &["list", "main"]);
     assert!(list.contains("col1\tcol2"), "got: {list:?}");
 }
 
 #[test]
 fn new_accepts_unicode_entry() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "café 漢字 🚀"]);
-    let list = run_ok(dir.path(), &["list"]);
+    run_ok(dir.path(), &["new", "main", "café 漢字 🚀"]);
+    let list = run_ok(dir.path(), &["list", "main"]);
     assert!(list.contains("café 漢字 🚀"));
 }
 
 #[test]
 fn update_rejects_entry_with_newline() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "clean"]);
-    let (code, _, stderr) = run(dir.path(), &["update", "1", "new\nline"]);
+    run_ok(dir.path(), &["new", "main", "clean"]);
+    let (code, _, stderr) = run(dir.path(), &["update", "main", "1", "new\nline"]);
     assert_ne!(code, 0);
     assert!(stderr.contains("newline"), "stderr: {stderr}");
 
     // Original file unchanged.
-    let contents = std::fs::read_to_string(main_devlog(dir.path())).unwrap();
+    let contents = std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
     assert!(contents.contains(": clean"));
 }
 
 #[test]
 fn update_rejects_entry_with_carriage_return() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "clean"]);
-    let (code, _, stderr) = run(dir.path(), &["update", "1", "a\rb"]);
+    run_ok(dir.path(), &["new", "main", "clean"]);
+    let (code, _, stderr) = run(dir.path(), &["update", "main", "1", "a\rb"]);
     assert_ne!(code, 0);
     assert!(stderr.contains("carriage return"), "stderr: {stderr}");
 }

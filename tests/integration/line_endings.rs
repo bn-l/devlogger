@@ -1,7 +1,7 @@
 //! Devlogger must read either LF or CRLF files and write them back with
 //! their original terminator preserved.
 
-use super::common::{main_devlog, run_ok};
+use super::common::{run_ok, section_devlog};
 
 fn seed(path: &std::path::Path, bytes: &[u8]) {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -22,11 +22,11 @@ fn count_bare_lf(bytes: &[u8]) -> usize {
 #[test]
 fn crlf_file_preserved_after_update() {
     let dir = tempfile::tempdir().unwrap();
-    let path = main_devlog(dir.path());
+    let path = section_devlog(dir.path(), "main");
     let before = b"- 1 | 2026-04-14 10:00:00: one\r\n- 2 | 2026-04-14 11:00:00: two\r\n";
     seed(&path, before);
 
-    run_ok(dir.path(), &["update", "2", "two-updated"]);
+    run_ok(dir.path(), &["update", "main", "2", "two-updated"]);
 
     let after = std::fs::read(&path).unwrap();
     assert_eq!(count_crlf(&after), 2, "should have 2 CRLF sequences: {after:?}");
@@ -37,11 +37,11 @@ fn crlf_file_preserved_after_update() {
 #[test]
 fn crlf_file_preserved_after_new() {
     let dir = tempfile::tempdir().unwrap();
-    let path = main_devlog(dir.path());
+    let path = section_devlog(dir.path(), "main");
     let before = b"- 1 | 2026-04-14 10:00:00: one\r\n";
     seed(&path, before);
 
-    run_ok(dir.path(), &["new", "two"]);
+    run_ok(dir.path(), &["new", "main", "two"]);
 
     let after = std::fs::read(&path).unwrap();
     assert_eq!(count_crlf(&after), 2, "one per entry: {after:?}");
@@ -51,12 +51,12 @@ fn crlf_file_preserved_after_new() {
 #[test]
 fn crlf_preserved_across_prose_in_update() {
     let dir = tempfile::tempdir().unwrap();
-    let path = main_devlog(dir.path());
+    let path = section_devlog(dir.path(), "main");
     let before =
         b"# Header\r\n\r\nSome prose.\r\n- 1 | 2026-04-14 10:00:00: one\r\n- 2 | 2026-04-14 11:00:00: two\r\n";
     seed(&path, before);
 
-    run_ok(dir.path(), &["update", "1", "ONE"]);
+    run_ok(dir.path(), &["update", "main", "1", "ONE"]);
 
     let after = std::fs::read(&path).unwrap();
     assert_eq!(count_bare_lf(&after), 0, "should remain pure CRLF: {after:?}");
@@ -72,11 +72,11 @@ fn crlf_preserved_across_prose_in_update() {
 #[test]
 fn lf_file_stays_lf_after_update() {
     let dir = tempfile::tempdir().unwrap();
-    let path = main_devlog(dir.path());
+    let path = section_devlog(dir.path(), "main");
     let before = b"- 1 | 2026-04-14 10:00:00: one\n- 2 | 2026-04-14 11:00:00: two\n";
     seed(&path, before);
 
-    run_ok(dir.path(), &["update", "2", "two-updated"]);
+    run_ok(dir.path(), &["update", "main", "2", "two-updated"]);
 
     let after = std::fs::read(&path).unwrap();
     assert_eq!(count_crlf(&after), 0, "should have no CRLF: {after:?}");
@@ -86,10 +86,10 @@ fn lf_file_stays_lf_after_update() {
 #[test]
 fn lf_file_stays_lf_after_new() {
     let dir = tempfile::tempdir().unwrap();
-    let path = main_devlog(dir.path());
+    let path = section_devlog(dir.path(), "main");
     seed(&path, b"- 1 | 2026-04-14 10:00:00: one\n");
 
-    run_ok(dir.path(), &["new", "two"]);
+    run_ok(dir.path(), &["new", "main", "two"]);
 
     let after = std::fs::read(&path).unwrap();
     assert_eq!(count_crlf(&after), 0);
@@ -101,8 +101,8 @@ fn lf_file_stays_lf_after_new() {
 #[test]
 fn fresh_file_uses_lf_by_default() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "first"]);
-    let after = std::fs::read(main_devlog(dir.path())).unwrap();
+    run_ok(dir.path(), &["new", "main", "first"]);
+    let after = std::fs::read(section_devlog(dir.path(), "main")).unwrap();
     assert_eq!(count_crlf(&after), 0);
     assert!(after.ends_with(b"\n"));
 }
@@ -112,13 +112,13 @@ fn fresh_file_uses_lf_by_default() {
 #[test]
 fn list_reads_crlf_file_correctly() {
     let dir = tempfile::tempdir().unwrap();
-    let path = main_devlog(dir.path());
+    let path = section_devlog(dir.path(), "main");
     seed(
         &path,
         b"- 1 | 2026-04-14 10:00:00: one\r\n- 2 | 2026-04-14 11:00:00: two\r\n",
     );
 
-    let out = run_ok(dir.path(), &["list"]);
+    let out = run_ok(dir.path(), &["list", "main"]);
     assert!(out.contains(": one"));
     assert!(out.contains(": two"));
 }

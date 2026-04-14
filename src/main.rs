@@ -4,7 +4,9 @@ use clap::Parser;
 use eyre::Result;
 
 use devlogger::cli::{Cli, Command};
-use devlogger::commands::{cmd_list, cmd_new, cmd_read, cmd_sections, cmd_update};
+use devlogger::commands::{
+    cmd_list, cmd_list_all, cmd_new, cmd_read, cmd_sections, cmd_update,
+};
 use devlogger::section::validate_section_name;
 
 /// Maximum terminal display width (in columns) for a single `list` row.
@@ -19,19 +21,29 @@ fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Command::New { args } => {
             let (section, text) = split_new_args(args)?;
-            let entry = cmd_new(&base, section.as_deref(), &text)?;
+            let entry = cmd_new(&base, &section, &text)?;
             println!("{}", entry.to_line());
         }
-        Command::List { args } => {
-            let section = args.into_iter().next();
-            if let Some(ref s) = section {
-                validate_section_name(s)?;
+        Command::List { args } => match args.into_iter().next() {
+            Some(section) => {
+                validate_section_name(&section)?;
+                let entries = cmd_list(&base, &section)?;
+                for e in &entries {
+                    println!("{}", e.to_line_truncated(LIST_LINE_MAX));
+                }
             }
-            let entries = cmd_list(&base, section.as_deref())?;
-            for e in &entries {
-                println!("{}", e.to_line_truncated(LIST_LINE_MAX));
+            None => {
+                let groups = cmd_list_all(&base)?;
+                for (name, entries) in groups {
+                    // Section names are ASCII, so byte length = display width.
+                    let prefix = format!("[{name}] ");
+                    let budget = LIST_LINE_MAX.saturating_sub(prefix.len());
+                    for e in &entries {
+                        println!("{prefix}{}", e.to_line_truncated(budget));
+                    }
+                }
             }
-        }
+        },
         Command::Sections => {
             for name in cmd_sections(&base)? {
                 println!("{name}");
@@ -39,63 +51,49 @@ fn run(cli: Cli) -> Result<()> {
         }
         Command::Update { args } => {
             let (section, id, text) = split_update_args(args)?;
-            let entry = cmd_update(&base, section.as_deref(), &id, &text)?;
+            let entry = cmd_update(&base, &section, &id, &text)?;
             println!("{}", entry.to_line());
         }
         Command::Read { args } => {
             let (section, n) = split_read_args(args)?;
-            let out = cmd_read(&base, section.as_deref(), n)?;
+            let out = cmd_read(&base, &section, n)?;
             print!("{out}");
         }
     }
     Ok(())
 }
 
-fn split_new_args(args: Vec<String>) -> Result<(Option<String>, String)> {
+fn split_new_args(args: Vec<String>) -> Result<(String, String)> {
+    // clap guarantees exactly 2
+    let mut it = args.into_iter();
+    let section = it.next().expect("clap enforces exactly 2 args");
+    let text = it.next().expect("clap enforces exactly 2 args");
+    validate_section_name(&section)?;
+    Ok((section, text))
+}
+
+fn split_update_args(args: Vec<String>) -> Result<(String, String, String)> {
+    // clap guarantees exactly 3
+    let mut it = args.into_iter();
+    let section = it.next().expect("clap enforces exactly 3 args");
+    let id = it.next().expect("clap enforces exactly 3 args");
+    let text = it.next().expect("clap enforces exactly 3 args");
+    validate_section_name(&section)?;
+    Ok((section, id, text))
+}
+
+fn split_read_args(args: Vec<String>) -> Result<(String, Option<usize>)> {
     // clap guarantees 1..=2
     let mut it = args.into_iter();
-    let first = it.next().expect("clap enforces at least 1 arg");
+    let section = it.next().expect("clap enforces at least 1 arg");
+    validate_section_name(&section)?;
     match it.next() {
-        None => Ok((None, first)),
-        Some(second) => {
-            validate_section_name(&first)?;
-            Ok((Some(first), second))
-        }
-    }
-}
-
-fn split_update_args(args: Vec<String>) -> Result<(Option<String>, String, String)> {
-    // clap guarantees 2..=3
-    let mut it = args.into_iter();
-    let a = it.next().expect("clap enforces at least 2 args");
-    let b = it.next().expect("clap enforces at least 2 args");
-    match it.next() {
-        None => Ok((None, a, b)),
-        Some(c) => {
-            validate_section_name(&a)?;
-            Ok((Some(a), b, c))
-        }
-    }
-}
-
-fn split_read_args(args: Vec<String>) -> Result<(Option<String>, Option<usize>)> {
-    let mut it = args.into_iter();
-    match (it.next(), it.next()) {
-        (None, _) => Ok((None, None)),
-        (Some(a), None) => {
-            if let Ok(n) = a.parse::<usize>() {
-                Ok((None, Some(n)))
-            } else {
-                validate_section_name(&a)?;
-                Ok((Some(a), None))
-            }
-        }
-        (Some(a), Some(b)) => {
-            validate_section_name(&a)?;
+        None => Ok((section, None)),
+        Some(b) => {
             let n: usize = b.parse().map_err(|_| {
                 eyre::eyre!("`<n>` must be a non-negative integer, got `{b}`")
             })?;
-            Ok((Some(a), Some(n)))
+            Ok((section, Some(n)))
         }
     }
 }

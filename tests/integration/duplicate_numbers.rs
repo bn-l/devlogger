@@ -3,7 +3,7 @@
 //! silently rewrite the wrong line: it resolves by entry position, and
 //! rejects a bare-number id that matches more than one entry.
 
-use super::common::{main_devlog, run, run_err, run_ok};
+use super::common::{run, run_err, run_ok, section_devlog};
 
 fn seed(path: &std::path::Path, contents: &str) {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -13,7 +13,7 @@ fn seed(path: &std::path::Path, contents: &str) {
 #[test]
 fn update_by_exact_date_targets_correct_entry_even_with_duplicate_numbers() {
     let dir = tempfile::tempdir().unwrap();
-    let path = main_devlog(dir.path());
+    let path = section_devlog(dir.path(), "main");
     seed(
         &path,
         "- 1 | 2026-04-14 10:00:00: first original\n\
@@ -22,7 +22,7 @@ fn update_by_exact_date_targets_correct_entry_even_with_duplicate_numbers() {
 
     run_ok(
         dir.path(),
-        &["update", "2026-04-14 11:00:00", "SECOND UPDATED"],
+        &["update", "main", "2026-04-14 11:00:00", "SECOND UPDATED"],
     );
 
     let after = std::fs::read_to_string(&path).unwrap();
@@ -43,11 +43,11 @@ fn update_by_exact_date_targets_correct_entry_even_with_duplicate_numbers() {
 fn update_by_ambiguous_number_errors_with_guidance() {
     let dir = tempfile::tempdir().unwrap();
     seed(
-        &main_devlog(dir.path()),
+        &section_devlog(dir.path(), "main"),
         "- 1 | 2026-04-14 10:00:00: a\n- 1 | 2026-04-14 11:00:00: b\n",
     );
 
-    let stderr = run_err(dir.path(), &["update", "1", "nope"]);
+    let stderr = run_err(dir.path(), &["update", "main", "1", "nope"]);
     assert!(stderr.contains("ambiguous"), "stderr: {stderr}");
     assert!(stderr.contains("number 1"), "stderr: {stderr}");
     assert!(stderr.contains("exact date"), "stderr: {stderr}");
@@ -56,11 +56,11 @@ fn update_by_ambiguous_number_errors_with_guidance() {
 #[test]
 fn update_by_ambiguous_number_does_not_mutate_file() {
     let dir = tempfile::tempdir().unwrap();
-    let path = main_devlog(dir.path());
+    let path = section_devlog(dir.path(), "main");
     let before = "- 1 | 2026-04-14 10:00:00: a\n- 1 | 2026-04-14 11:00:00: b\n";
     seed(&path, before);
 
-    let (code, _, _) = run(dir.path(), &["update", "1", "nope"]);
+    let (code, _, _) = run(dir.path(), &["update", "main", "1", "nope"]);
     assert_ne!(code, 0);
 
     let after = std::fs::read_to_string(&path).unwrap();
@@ -71,11 +71,11 @@ fn update_by_ambiguous_number_does_not_mutate_file() {
 fn update_by_date_prefix_errors_when_multiple_entries_match() {
     let dir = tempfile::tempdir().unwrap();
     seed(
-        &main_devlog(dir.path()),
+        &section_devlog(dir.path(), "main"),
         "- 1 | 2026-04-14 10:00:00: a\n- 2 | 2026-04-14 11:00:00: b\n",
     );
 
-    let stderr = run_err(dir.path(), &["update", "2026-04-14", "nope"]);
+    let stderr = run_err(dir.path(), &["update", "main", "2026-04-14", "nope"]);
     assert!(stderr.contains("ambiguous date prefix"), "stderr: {stderr}");
 }
 
@@ -85,11 +85,11 @@ fn list_still_works_on_file_with_duplicate_numbers() {
     // them by number is rejected.
     let dir = tempfile::tempdir().unwrap();
     seed(
-        &main_devlog(dir.path()),
+        &section_devlog(dir.path(), "main"),
         "- 1 | 2026-04-14 10:00:00: a\n- 1 | 2026-04-14 11:00:00: b\n",
     );
 
-    let out = run_ok(dir.path(), &["list"]);
+    let out = run_ok(dir.path(), &["list", "main"]);
     assert!(out.contains(": a"));
     assert!(out.contains(": b"));
 }

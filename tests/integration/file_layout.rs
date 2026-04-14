@@ -1,12 +1,4 @@
-use super::common::{main_devlog, run_ok, section_devlog};
-
-#[test]
-fn main_devlog_lives_at_devlog_main_devlog_md() {
-    let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "x"]);
-    assert_eq!(main_devlog(dir.path()), dir.path().join("DEVLOG/main-devlog.md"));
-    assert!(main_devlog(dir.path()).is_file());
-}
+use super::common::{run_ok, section_devlog};
 
 #[test]
 fn section_devlog_nests_section_subdirectory() {
@@ -24,7 +16,7 @@ fn devlog_folder_is_named_uppercase_devlog() {
     // resolve to the same dir as `DEVLOG`, so check the actual on-disk
     // name by reading the parent directory.
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "x"]);
+    run_ok(dir.path(), &["new", "main", "x"]);
     let names: Vec<String> = std::fs::read_dir(dir.path())
         .unwrap()
         .filter_map(|e| e.ok())
@@ -56,19 +48,19 @@ fn creates_parents_when_devlog_dir_missing() {
 #[test]
 fn file_ends_with_newline() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "x"]);
-    let contents = std::fs::read_to_string(main_devlog(dir.path())).unwrap();
+    run_ok(dir.path(), &["new", "main", "x"]);
+    let contents = std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
     assert!(contents.ends_with('\n'), "file should end with newline: {contents:?}");
 }
 
 #[test]
 fn no_temp_file_left_behind_after_update() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "one"]);
-    run_ok(dir.path(), &["update", "1", "two"]);
+    run_ok(dir.path(), &["new", "main", "one"]);
+    run_ok(dir.path(), &["update", "main", "1", "two"]);
 
-    let devlog_dir = dir.path().join("DEVLOG");
-    let leftovers: Vec<_> = std::fs::read_dir(&devlog_dir)
+    let section_dir = dir.path().join("DEVLOG").join("main");
+    let leftovers: Vec<_> = std::fs::read_dir(&section_dir)
         .unwrap()
         .filter_map(|e| e.ok())
         .filter(|e| {

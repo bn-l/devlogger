@@ -25,11 +25,18 @@ fn short_flag_after_subcommand() {
 
 #[test]
 fn short_flag_after_subcommand_with_positional() {
-    let cli =
-        Cli::try_parse_from(["devlogger", "new", "my entry", "-f", "/tmp/proj"]).unwrap();
+    let cli = Cli::try_parse_from([
+        "devlogger",
+        "new",
+        "backend",
+        "my entry",
+        "-f",
+        "/tmp/proj",
+    ])
+    .unwrap();
     assert_eq!(cli.file, Some(PathBuf::from("/tmp/proj")));
     match cli.command {
-        Command::New { args } => assert_eq!(args, vec!["my entry"]),
+        Command::New { args } => assert_eq!(args, vec!["backend", "my entry"]),
         _ => panic!(),
     }
 }
@@ -42,6 +49,6 @@ fn long_flag_is_also_global() {
 
 #[test]
 fn long_flag_before_subcommand() {
-    let cli = Cli::try_parse_from(["devlogger", "--file", "/x", "read"]).unwrap();
+    let cli = Cli::try_parse_from(["devlogger", "--file", "/x", "read", "backend"]).unwrap();
     assert_eq!(cli.file, Some(PathBuf::from("/x")));
 }

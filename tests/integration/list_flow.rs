@@ -1,20 +1,27 @@
 use super::common::{run, run_err, run_ok};
 
 #[test]
-fn list_on_missing_file_errors() {
+fn list_section_on_missing_file_errors() {
     let dir = tempfile::tempdir().unwrap();
-    let stderr = run_err(dir.path(), &["list"]);
+    let stderr = run_err(dir.path(), &["list", "main"]);
     assert!(stderr.contains("devlog not found"), "stderr: {stderr}");
+}
+
+#[test]
+fn list_with_no_args_on_empty_project_prints_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = run_ok(dir.path(), &["list"]);
+    assert!(out.is_empty(), "expected empty output; got: {out:?}");
 }
 
 #[test]
 fn list_shows_entries_in_order() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "alpha"]);
-    run_ok(dir.path(), &["new", "beta"]);
-    run_ok(dir.path(), &["new", "gamma"]);
+    run_ok(dir.path(), &["new", "main", "alpha"]);
+    run_ok(dir.path(), &["new", "main", "beta"]);
+    run_ok(dir.path(), &["new", "main", "gamma"]);
 
-    let out = run_ok(dir.path(), &["list"]);
+    let out = run_ok(dir.path(), &["list", "main"]);
     let lines: Vec<&str> = out.lines().collect();
     assert_eq!(lines.len(), 3);
     assert!(lines[0].contains(": alpha"));
@@ -23,18 +30,58 @@ fn list_shows_entries_in_order() {
 }
 
 #[test]
-fn list_main_and_section_are_separate() {
+fn list_sections_are_independent() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "main thing"]);
+    run_ok(dir.path(), &["new", "main", "main thing"]);
     run_ok(dir.path(), &["new", "backend", "back thing"]);
 
-    let main = run_ok(dir.path(), &["list"]);
+    let main = run_ok(dir.path(), &["list", "main"]);
     let sect = run_ok(dir.path(), &["list", "backend"]);
 
     assert!(main.contains("main thing"));
     assert!(!main.contains("back thing"));
     assert!(sect.contains("back thing"));
     assert!(!sect.contains("main thing"));
+}
+
+#[test]
+fn list_all_prefixes_each_line_with_section_name() {
+    // `list` with no section prints every entry with a `[<section>] `
+    // prefix, sections ordered alphabetically, one entry per line.
+    let dir = tempfile::tempdir().unwrap();
+    run_ok(dir.path(), &["new", "backend", "b1"]);
+    run_ok(dir.path(), &["new", "backend", "b2"]);
+    run_ok(dir.path(), &["new", "alpha", "a1"]);
+
+    let out = run_ok(dir.path(), &["list"]);
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(lines.len(), 3, "expected 3 entry lines:\n{out}");
+    assert!(lines[0].starts_with("[alpha] - "), "got: {}", lines[0]);
+    assert!(lines[0].contains(": a1"));
+    assert!(lines[1].starts_with("[backend] - "), "got: {}", lines[1]);
+    assert!(lines[1].contains(": b1"));
+    assert!(lines[2].starts_with("[backend] - "), "got: {}", lines[2]);
+    assert!(lines[2].contains(": b2"));
+}
+
+#[test]
+fn list_all_rows_fit_in_80_columns_including_prefix() {
+    // A long entry in a named section must still fit within 80 display
+    // columns once the `[section] ` prefix is prepended.
+    let dir = tempfile::tempdir().unwrap();
+    let long = "x".repeat(300);
+    run_ok(dir.path(), &["new", "backend", &long]);
+
+    let out = run_ok(dir.path(), &["list"]);
+    let line = out.lines().next().unwrap();
+    use unicode_width::UnicodeWidthStr;
+    assert!(
+        line.width() <= 80,
+        "line width is {} cols, expected <= 80: {line}",
+        line.width()
+    );
+    assert!(line.starts_with("[backend] "), "prefix must be intact: {line}");
+    assert!(line.ends_with(" more)"), "got: {line}");
 }
 
 #[test]
@@ -55,8 +102,8 @@ fn list_rejects_invalid_section_name() {
 #[test]
 fn list_output_shape_matches_canonical_entry_line() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "hello"]);
-    let out = run_ok(dir.path(), &["list"]);
+    run_ok(dir.path(), &["new", "main", "hello"]);
+    let out = run_ok(dir.path(), &["list", "main"]);
     let first = out.lines().next().unwrap();
     // Shape: "- <N> | <YYYY-MM-DD HH:MM:SS>: <text>"
     assert!(first.starts_with("- 1 | "), "got: {first}");
@@ -67,9 +114,9 @@ fn list_output_shape_matches_canonical_entry_line() {
 fn list_truncates_long_entries_to_80_chars_with_suffix() {
     let dir = tempfile::tempdir().unwrap();
     let long = "x".repeat(200);
-    run_ok(dir.path(), &["new", &long]);
+    run_ok(dir.path(), &["new", "main", &long]);
 
-    let out = run_ok(dir.path(), &["list"]);
+    let out = run_ok(dir.path(), &["list", "main"]);
     let line = out.lines().next().unwrap();
 
     assert!(
@@ -84,9 +131,9 @@ fn list_truncates_long_entries_to_80_chars_with_suffix() {
 #[test]
 fn list_does_not_truncate_short_entries() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "short"]);
+    run_ok(dir.path(), &["new", "main", "short"]);
 
-    let out = run_ok(dir.path(), &["list"]);
+    let out = run_ok(dir.path(), &["list", "main"]);
     let line = out.lines().next().unwrap();
 
     assert!(!line.contains("more)"), "got: {line}");
@@ -98,9 +145,9 @@ fn list_truncates_by_display_width_for_wide_glyphs() {
     // 100 CJK chars = 200 display columns raw; list output must fit in 80.
     let dir = tempfile::tempdir().unwrap();
     let wide: String = "漢".repeat(100);
-    run_ok(dir.path(), &["new", &wide]);
+    run_ok(dir.path(), &["new", "main", &wide]);
 
-    let out = run_ok(dir.path(), &["list"]);
+    let out = run_ok(dir.path(), &["list", "main"]);
     let line = out.lines().next().unwrap();
 
     // Compute display width the same way the binary does.
@@ -119,9 +166,9 @@ fn list_elided_count_is_accurate() {
     // 200-char text; full rendered line is `- 1 | YYYY-MM-DD HH:MM:SS: `
     // (27 chars of prefix) + 200 = 227 chars total.
     let long = "x".repeat(200);
-    run_ok(dir.path(), &["new", &long]);
+    run_ok(dir.path(), &["new", "main", &long]);
 
-    let out = run_ok(dir.path(), &["list"]);
+    let out = run_ok(dir.path(), &["list", "main"]);
     let line = out.lines().next().unwrap();
 
     let open = line.rfind("(...").unwrap();

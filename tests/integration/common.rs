@@ -51,10 +51,6 @@ pub fn run_err(base: &Path, args: &[&str]) -> String {
     stderr
 }
 
-pub fn main_devlog(base: &Path) -> PathBuf {
-    base.join("DEVLOG").join("main-devlog.md")
-}
-
 pub fn section_devlog(base: &Path, section: &str) -> PathBuf {
     base.join("DEVLOG")
         .join(section)

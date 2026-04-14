@@ -1,8 +1,7 @@
-//! Clap definitions.  Each subcommand takes a single `Vec<String>` of
-//! positional args with tight `num_args` bounds; `main.rs` dispatches
-//! based on `args.len()`.  This keeps the ergonomic shape the user asked
-//! for — `new [<section>] <entry>` etc. — without fighting clap's
-//! optional-before-required positional semantics.
+//! Clap definitions.  `new`, `update`, `read` take a required section name
+//! as their first positional arg; `list` takes an optional section (without
+//! one, it lists every section's entries grouped by section).  `main.rs`
+//! dispatches the positional `Vec<String>` into these shapes.
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -13,8 +12,11 @@ use std::path::PathBuf;
     version,
     about = "Append-only markdown devlog CLI",
     long_about = "Manage a markdown devlog in <dir>/DEVLOG/.\n\n\
-                  The main log lives at <dir>/DEVLOG/main-devlog.md.\n\
-                  Named sections live at <dir>/DEVLOG/<section>/<section>-devlog.md.\n\n\
+                  Sections live at <dir>/DEVLOG/<section>/<section>-devlog.md.\n\
+                  Every entry belongs to a section — `new`, `update`, and\n\
+                  `read` require a section name; `list` takes one optionally\n\
+                  (without one, it prints every section's entries grouped by\n\
+                  section).\n\n\
                   Section names must match [a-z]+(-[a-z]+)* — lowercase letters\n\
                   and hyphens only.\n\n\
                   `list` prints each entry truncated to 80 terminal columns,\n\
@@ -36,17 +38,20 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Add a new entry.  `devlogger new [<section>] <entry>`
+    /// Add a new entry.  `devlogger new <section> <entry>`
     New {
-        #[arg(required = true, num_args = 1..=2)]
+        #[arg(required = true, num_args = 2)]
         args: Vec<String>,
     },
 
     /// List entries with their canonical numbers.  `devlogger list [<section>]`
     ///
-    /// Each row is truncated to 80 terminal columns; elided entries end
-    /// with ` (...N more)` where N is the number of elided characters.
-    /// Wide glyphs (CJK, most emoji) count as two columns.
+    /// With no section, prints every section's entries with a
+    /// `[<section>] ` prefix on each line.  With a section, prints just
+    /// that section's entries with no prefix.  Each row is truncated to
+    /// 80 terminal columns (prefix included); elided entries end with
+    /// ` (...N more)` where N is the number of elided characters.  Wide
+    /// glyphs (CJK, most emoji) count as two columns.
     List {
         #[arg(num_args = 0..=1)]
         args: Vec<String>,
@@ -55,18 +60,18 @@ pub enum Command {
     /// List all section names, one per line.  `devlogger sections`
     Sections,
 
-    /// Update an entry's text.  `devlogger update [<section>] <id> <entry>`
+    /// Update an entry's text.  `devlogger update <section> <id> <entry>`
     /// where <id> is the entry number or date shown by `list`.
     Update {
-        #[arg(required = true, num_args = 2..=3)]
+        #[arg(required = true, num_args = 3)]
         args: Vec<String>,
     },
 
-    /// Read the devlog.  `devlogger read [<section>] [<n>]`
+    /// Read the devlog.  `devlogger read <section> [<n>]`
     /// With no <n>, prints the whole file.  With <n>, prints the last
     /// <n> entry lines.
     Read {
-        #[arg(num_args = 0..=2)]
+        #[arg(required = true, num_args = 1..=2)]
         args: Vec<String>,
     },
 }

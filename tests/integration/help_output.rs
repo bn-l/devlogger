@@ -75,5 +75,5 @@ fn help_works_in_empty_directory() {
 #[test]
 fn binary_runs_correctly_after_help_invocations() {
     let dir = tempfile::tempdir().unwrap();
-    run_ok(dir.path(), &["new", "sanity"]);
+    run_ok(dir.path(), &["new", "main", "sanity"]);
 }

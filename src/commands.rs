@@ -14,27 +14,21 @@ use std::path::{Path, PathBuf};
 use crate::entry::{
     DATE_FORMAT, Entry, detect_line_ending, parse_file, validate_entry_text,
 };
-use crate::section::{main_devlog_path, section_devlog_path, validate_section_name};
+use crate::section::{section_devlog_path, validate_section_name};
 use crate::store::{
     acquire_lock_for, append_line, load_entries, read_contents, rewrite_file,
 };
 
-/// Resolve the devlog file path for an optional section.  Validates the
-/// section name if one was supplied.
-pub fn resolve_path(base: &Path, section: Option<&str>) -> Result<PathBuf> {
-    match section {
-        Some(name) => {
-            validate_section_name(name)?;
-            Ok(section_devlog_path(base, name))
-        }
-        None => Ok(main_devlog_path(base)),
-    }
+/// Resolve the devlog file path for a section.  Validates the section name.
+pub fn resolve_path(base: &Path, section: &str) -> Result<PathBuf> {
+    validate_section_name(section)?;
+    Ok(section_devlog_path(base, section))
 }
 
 /// Append a new entry.  Number is max(existing) + 1, or 1 if empty.
 /// Holds an exclusive lock across the read-compute-write so parallel
 /// invocations cannot produce duplicate numbers or interleaved writes.
-pub fn cmd_new(base: &Path, section: Option<&str>, text: &str) -> Result<Entry> {
+pub fn cmd_new(base: &Path, section: &str, text: &str) -> Result<Entry> {
     validate_entry_text(text)?;
     let path = resolve_path(base, section)?;
     let _lock = acquire_lock_for(&path)?;
@@ -64,13 +58,27 @@ pub fn cmd_new(base: &Path, section: Option<&str>, text: &str) -> Result<Entry> 
     Ok(entry)
 }
 
-/// Load all entries from a devlog (main or section).
-pub fn cmd_list(base: &Path, section: Option<&str>) -> Result<Vec<Entry>> {
+/// Load all entries from a section's devlog.
+pub fn cmd_list(base: &Path, section: &str) -> Result<Vec<Entry>> {
     let path = resolve_path(base, section)?;
     if !path.exists() {
         bail!("devlog not found: {}", path.display());
     }
     load_entries(&path)
+}
+
+/// Load entries for every section, returning a vector of (section, entries)
+/// pairs in alphabetical order of section name.  Sections with no parseable
+/// devlog file are skipped — `cmd_sections` already filters to sections
+/// whose canonical file exists.
+pub fn cmd_list_all(base: &Path) -> Result<Vec<(String, Vec<Entry>)>> {
+    let sections = cmd_sections(base)?;
+    let mut out = Vec::with_capacity(sections.len());
+    for name in sections {
+        let entries = load_entries(&section_devlog_path(base, &name))?;
+        out.push((name, entries));
+    }
+    Ok(out)
 }
 
 /// List every section that has a devlog under `<base>/DEVLOG/`.  A section
@@ -123,7 +131,7 @@ pub fn cmd_sections(base: &Path) -> Result<Vec<String>> {
 /// file's original line terminators (`\n` or `\r\n`).
 pub fn cmd_update(
     base: &Path,
-    section: Option<&str>,
+    section: &str,
     id: &str,
     new_text: &str,
 ) -> Result<Entry> {
@@ -185,7 +193,7 @@ pub fn cmd_update(
 
 /// Read the devlog.  `n = None` dumps the whole file verbatim.  `n =
 /// Some(k)` dumps the last `k` entry lines (prose lines are skipped).
-pub fn cmd_read(base: &Path, section: Option<&str>, n: Option<usize>) -> Result<String> {
+pub fn cmd_read(base: &Path, section: &str, n: Option<usize>) -> Result<String> {
     let path = resolve_path(base, section)?;
     if !path.exists() {
         bail!("devlog not found: {}", path.display());

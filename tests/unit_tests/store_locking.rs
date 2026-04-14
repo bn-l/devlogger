@@ -5,16 +5,8 @@
 use std::thread;
 use std::time::Duration;
 
-use devlogger::section::{main_devlog_path, section_devlog_path};
+use devlogger::section::section_devlog_path;
 use devlogger::store::{acquire_lock_for, lock_path_for};
-
-#[test]
-fn lock_path_is_sidecar_in_same_dir_for_main() {
-    let dir = tempfile::tempdir().unwrap();
-    let main = main_devlog_path(dir.path());
-    let lp = lock_path_for(&main).unwrap();
-    assert_eq!(lp, dir.path().join("DEVLOG").join(".devlogger.lock"));
-}
 
 #[test]
 fn lock_path_is_sidecar_in_same_dir_for_section() {
@@ -33,14 +25,14 @@ fn lock_path_is_sidecar_in_same_dir_for_section() {
 #[test]
 fn acquire_lock_creates_lockfile_and_parent_dir() {
     let dir = tempfile::tempdir().unwrap();
-    let main = main_devlog_path(dir.path());
-    assert!(!main.parent().unwrap().exists());
+    let section = section_devlog_path(dir.path(), "backend");
+    assert!(!section.parent().unwrap().exists());
 
-    let _guard = acquire_lock_for(&main).unwrap();
+    let _guard = acquire_lock_for(&section).unwrap();
 
-    assert!(main.parent().unwrap().is_dir(), "parent dir should be created");
+    assert!(section.parent().unwrap().is_dir(), "parent dir should be created");
     assert!(
-        lock_path_for(&main).unwrap().is_file(),
+        lock_path_for(&section).unwrap().is_file(),
         "lockfile should be created"
     );
 }
@@ -50,10 +42,10 @@ fn second_acquire_blocks_until_first_released() {
     // Hold an exclusive lock, then in a background thread try to acquire
     // again.  The background acquire must not complete until we drop.
     let dir = tempfile::tempdir().unwrap();
-    let main = main_devlog_path(dir.path());
-    let first = acquire_lock_for(&main).unwrap();
+    let section = section_devlog_path(dir.path(), "backend");
+    let first = acquire_lock_for(&section).unwrap();
 
-    let path = main.clone();
+    let path = section.clone();
     let handle = thread::spawn(move || {
         let start = std::time::Instant::now();
         let _second = acquire_lock_for(&path).unwrap();

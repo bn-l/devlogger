@@ -2,21 +2,9 @@ use clap::Parser;
 use devlogger::cli::{Cli, Command};
 
 #[test]
-fn read_with_no_args() {
-    let cli = Cli::try_parse_from(["devlogger", "read"]).unwrap();
-    match cli.command {
-        Command::Read { args } => assert!(args.is_empty()),
-        _ => panic!("expected Read"),
-    }
-}
-
-#[test]
-fn read_with_numeric_arg() {
-    let cli = Cli::try_parse_from(["devlogger", "read", "5"]).unwrap();
-    match cli.command {
-        Command::Read { args } => assert_eq!(args, vec!["5"]),
-        _ => panic!(),
-    }
+fn read_with_no_args_is_error() {
+    // Section is now required.
+    assert!(Cli::try_parse_from(["devlogger", "read"]).is_err());
 }
 
 #[test]

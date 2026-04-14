@@ -19,15 +19,14 @@ cargo install --path .
 ## Layout
 
 Logs live under a `DEVLOG/` directory in whatever base directory you point
-`devlogger` at (default: `cwd`, override with `-f <dir>`):
+`devlogger` at (default: `cwd`, override with `-f <dir>`). Every entry
+belongs to a section; each section has its own file:
 
 ```
-<base>/DEVLOG/main-devlog.md
 <base>/DEVLOG/<section>/<section>-devlog.md
 ```
 
-The main log is implicit; sections are created the first time you write
-to them.
+Sections are created the first time you write to them.
 
 ## Entry format
 
@@ -45,18 +44,24 @@ parsing fails loudly with a path and line number.
 ## Commands
 
 ```sh
-devlogger new [<section>] <entry>           # append
-devlogger list [<section>]                  # list with canonical numbers
-devlogger sections                          # list all section names
-devlogger update [<section>] <id> <entry>   # rewrite one entry's text
-devlogger read [<section>] [<n>]            # dump file, or last <n> entries
+devlogger new <section> <entry>            # append
+devlogger list [<section>]                 # list with canonical numbers
+devlogger sections                         # list all section names
+devlogger update <section> <id> <entry>    # rewrite one entry's text
+devlogger read <section> [<n>]             # dump file, or last <n> entries
 ```
 
+A section name is required for `new`, `update`, and `read`. `list` takes
+one optionally: without a section it prints every section's entries,
+one per line, each prefixed with `[<section>] ` so you can tell at a
+glance which section a line belongs to. Sections come out in
+alphabetical order.
+
 `list` prints each entry truncated to 80 terminal columns so rows fit
-on one line. Wide glyphs (CJK, most emoji) count as two columns. When
-an entry is longer than that, the row ends with ` (...N more)` where
-`N` is the number of elided characters. Use `read` to dump entries
-verbatim.
+on one line (the `[<section>] ` prefix counts against that budget).
+Wide glyphs (CJK, most emoji) count as two columns. When an entry is
+longer than that, the row ends with ` (...N more)` where `N` is the
+number of elided characters. Use `read` to dump entries verbatim.
 
 `sections` prints one section name per line, sorted alphabetically.
 Output is empty when there are no sections yet.
