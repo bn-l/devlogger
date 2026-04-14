@@ -4,8 +4,11 @@ use clap::Parser;
 use eyre::Result;
 
 use devlogger::cli::{Cli, Command};
-use devlogger::commands::{cmd_list, cmd_new, cmd_read, cmd_update};
+use devlogger::commands::{cmd_list, cmd_new, cmd_read, cmd_sections, cmd_update};
 use devlogger::section::validate_section_name;
+
+/// Maximum terminal display width (in columns) for a single `list` row.
+const LIST_LINE_MAX: usize = 80;
 
 fn run(cli: Cli) -> Result<()> {
     let base = match cli.file {
@@ -26,7 +29,12 @@ fn run(cli: Cli) -> Result<()> {
             }
             let entries = cmd_list(&base, section.as_deref())?;
             for e in &entries {
-                println!("{}", e.to_line());
+                println!("{}", e.to_line_truncated(LIST_LINE_MAX));
+            }
+        }
+        Command::Sections => {
+            for name in cmd_sections(&base)? {
+                println!("{name}");
             }
         }
         Command::Update { args } => {

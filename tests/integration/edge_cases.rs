@@ -33,9 +33,10 @@ fn very_long_entry_text_is_accepted() {
     let dir = tempfile::tempdir().unwrap();
     let long = "x".repeat(50_000);
     run_ok(dir.path(), &["new", &long]);
-    let list = run_ok(dir.path(), &["list"]);
-    // 50k 'x's somewhere in the output.
-    assert!(list.contains(&long));
+    // `list` truncates each row to 80 chars; verify the full text is
+    // stored on disk and retrievable verbatim via `read`.
+    let read = run_ok(dir.path(), &["read"]);
+    assert!(read.contains(&long));
 }
 
 #[test]

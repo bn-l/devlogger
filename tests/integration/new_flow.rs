@@ -1,4 +1,4 @@
-use super::common::{bin, count_entries, main_devlog, run, run_ok, section_devlog};
+use super::common::{bin, count_entries, main_devlog, run, run_err, run_ok, section_devlog};
 
 #[test]
 fn first_new_creates_devlog_directory_and_file() {
@@ -121,4 +121,24 @@ fn new_fails_on_invalid_section_name() {
     let (code, _out, stderr) = run(dir.path(), &["new", "5", "nope"]);
     assert_ne!(code, 0);
     assert!(stderr.contains("invalid section name"), "stderr: {stderr}");
+}
+
+#[test]
+fn new_reports_exhaustion_instead_of_overflowing_u32_max() {
+    // If someone hand-edits a log so the highest entry is u32::MAX, the
+    // next `new` must fail cleanly — not panic (debug) and not silently
+    // wrap to 0 (release).
+    let dir = tempfile::tempdir().unwrap();
+    let path = main_devlog(dir.path());
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, "- 4294967295 | 2026-04-14 10:00:00: max\n").unwrap();
+
+    let stderr = run_err(dir.path(), &["new", "after max"]);
+    assert!(
+        stderr.contains("numbering exhausted"),
+        "stderr should mention exhaustion: {stderr}"
+    );
+    // File must be untouched.
+    let contents = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(contents, "- 4294967295 | 2026-04-14 10:00:00: max\n");
 }

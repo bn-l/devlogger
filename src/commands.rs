@@ -8,6 +8,7 @@
 
 use chrono::Local;
 use eyre::{Result, WrapErr, bail};
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::entry::{
@@ -44,7 +45,16 @@ pub fn cmd_new(base: &Path, section: Option<&str>, text: &str) -> Result<Entry> 
         String::new()
     };
     let existing = parse_file(&path, &existing_contents)?;
-    let next_number = existing.iter().map(|e| e.number).max().unwrap_or(0) + 1;
+    let next_number = match existing.iter().map(|e| e.number).max() {
+        None => 1,
+        Some(max) => max.checked_add(1).ok_or_else(|| {
+            eyre::eyre!(
+                "entry numbering exhausted: {} already has an entry numbered {} (u32::MAX)",
+                path.display(),
+                u32::MAX,
+            )
+        })?,
+    };
 
     let line_ending = detect_line_ending(&existing_contents);
 
@@ -61,6 +71,43 @@ pub fn cmd_list(base: &Path, section: Option<&str>) -> Result<Vec<Entry>> {
         bail!("devlog not found: {}", path.display());
     }
     load_entries(&path)
+}
+
+/// List every section that has a devlog under `<base>/DEVLOG/`.  A section
+/// counts only when both its directory name is a valid section name AND
+/// the canonical `<name>/<name>-devlog.md` file exists — stray
+/// directories under `DEVLOG/` are ignored.  Names are returned sorted
+/// alphabetically.  A missing `DEVLOG/` directory returns an empty vector
+/// rather than an error, so `sections` on a fresh project is a no-op
+/// instead of a failure.
+pub fn cmd_sections(base: &Path) -> Result<Vec<String>> {
+    let devlog_dir = base.join("DEVLOG");
+    if !devlog_dir.exists() {
+        return Ok(Vec::new());
+    }
+    let read_dir = fs::read_dir(&devlog_dir)
+        .wrap_err_with(|| format!("failed to read {}", devlog_dir.display()))?;
+
+    let mut sections = Vec::new();
+    for dirent in read_dir {
+        let dirent =
+            dirent.wrap_err_with(|| format!("failed to read {}", devlog_dir.display()))?;
+        let path = dirent.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if validate_section_name(name).is_err() {
+            continue;
+        }
+        if path.join(format!("{name}-devlog.md")).is_file() {
+            sections.push(name.to_string());
+        }
+    }
+    sections.sort();
+    Ok(sections)
 }
 
 /// Update an existing entry's text.  `id` is either:

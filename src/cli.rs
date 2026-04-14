@@ -17,6 +17,10 @@ use std::path::PathBuf;
                   Named sections live at <dir>/DEVLOG/<section>/<section>-devlog.md.\n\n\
                   Section names must match [a-z]+(-[a-z]+)* — lowercase letters\n\
                   and hyphens only.\n\n\
+                  `list` prints each entry truncated to 80 terminal columns,\n\
+                  ending with ` (...N more)` when content was elided (N is the\n\
+                  number of elided characters).  `sections` prints every\n\
+                  section name, one per line.\n\n\
                   Multi-word entries must be quoted on the command line."
 )]
 pub struct Cli {
@@ -39,10 +43,17 @@ pub enum Command {
     },
 
     /// List entries with their canonical numbers.  `devlogger list [<section>]`
+    ///
+    /// Each row is truncated to 80 terminal columns; elided entries end
+    /// with ` (...N more)` where N is the number of elided characters.
+    /// Wide glyphs (CJK, most emoji) count as two columns.
     List {
         #[arg(num_args = 0..=1)]
         args: Vec<String>,
     },
+
+    /// List all section names, one per line.  `devlogger sections`
+    Sections,
 
     /// Update an entry's text.  `devlogger update [<section>] <id> <entry>`
     /// where <id> is the entry number or date shown by `list`.

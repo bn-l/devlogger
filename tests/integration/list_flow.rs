@@ -62,3 +62,74 @@ fn list_output_shape_matches_canonical_entry_line() {
     assert!(first.starts_with("- 1 | "), "got: {first}");
     assert!(first.contains(": hello"), "got: {first}");
 }
+
+#[test]
+fn list_truncates_long_entries_to_80_chars_with_suffix() {
+    let dir = tempfile::tempdir().unwrap();
+    let long = "x".repeat(200);
+    run_ok(dir.path(), &["new", &long]);
+
+    let out = run_ok(dir.path(), &["list"]);
+    let line = out.lines().next().unwrap();
+
+    assert!(
+        line.chars().count() <= 80,
+        "line is {} chars: {line}",
+        line.chars().count()
+    );
+    assert!(line.ends_with(" more)"), "got: {line}");
+    assert!(line.contains("(..."), "got: {line}");
+}
+
+#[test]
+fn list_does_not_truncate_short_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    run_ok(dir.path(), &["new", "short"]);
+
+    let out = run_ok(dir.path(), &["list"]);
+    let line = out.lines().next().unwrap();
+
+    assert!(!line.contains("more)"), "got: {line}");
+    assert!(line.ends_with(": short"), "got: {line}");
+}
+
+#[test]
+fn list_truncates_by_display_width_for_wide_glyphs() {
+    // 100 CJK chars = 200 display columns raw; list output must fit in 80.
+    let dir = tempfile::tempdir().unwrap();
+    let wide: String = "漢".repeat(100);
+    run_ok(dir.path(), &["new", &wide]);
+
+    let out = run_ok(dir.path(), &["list"]);
+    let line = out.lines().next().unwrap();
+
+    // Compute display width the same way the binary does.
+    use unicode_width::UnicodeWidthStr;
+    assert!(
+        line.width() <= 80,
+        "line width is {} cols, expected ≤ 80: {line}",
+        line.width()
+    );
+    assert!(line.ends_with(" more)"), "got: {line}");
+}
+
+#[test]
+fn list_elided_count_is_accurate() {
+    let dir = tempfile::tempdir().unwrap();
+    // 200-char text; full rendered line is `- 1 | YYYY-MM-DD HH:MM:SS: `
+    // (27 chars of prefix) + 200 = 227 chars total.
+    let long = "x".repeat(200);
+    run_ok(dir.path(), &["new", &long]);
+
+    let out = run_ok(dir.path(), &["list"]);
+    let line = out.lines().next().unwrap();
+
+    let open = line.rfind("(...").unwrap();
+    let close = line.rfind(" more)").unwrap();
+    let reported: usize = line[open + 4..close].parse().unwrap();
+
+    // Reconstruct: chars in line minus the " (...N more)" suffix = kept.
+    let suffix_chars = line[open..].chars().count() + 1;
+    let kept = line.chars().count() - suffix_chars;
+    assert_eq!(kept + reported, 227);
+}

@@ -1,6 +1,8 @@
+mod dst_round_trip;
 mod entry_formatter;
 mod entry_parser;
 mod entry_text_validation;
+mod entry_truncation;
 mod line_ending_detection;
 mod section_validation;
 mod store_locking;

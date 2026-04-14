@@ -19,7 +19,7 @@ fn run_captured(args: &[&str]) -> (i32, String) {
 fn help_exits_zero_and_lists_all_subcommands() {
     let (code, text) = run_captured(&["--help"]);
     assert_eq!(code, 0, "text: {text}");
-    for word in ["new", "list", "update", "read"] {
+    for word in ["new", "list", "update", "read", "sections"] {
         assert!(text.contains(word), "help missing subcommand `{word}`: {text}");
     }
     assert!(text.contains("--file") || text.contains("-f"));
