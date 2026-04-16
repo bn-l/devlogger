@@ -1,8 +1,11 @@
 # devlogger
 
-An append-only markdown devlog CLI. Keeps a plain, human-readable log of
-what you did, when, with stable numeric IDs — so you can grep it, diff it,
-commit it, and edit it by hand.
+This is my approach to longer term memory: A "devlog". The idea is that writing a "DEVLOG" would likely come natural to an LLM because of its training data. This small CLI and skill (see [`./skill/`](./skill/)) provide rails to help it maintain a sectioned, chronological devlog (previous attempts with this as a mere instruction didn't work out because of difficulty maintaining order). 
+
+The CLI part is appends to a markdown devlog with dates and numeric IDs to help the LLM operate with it.
+
+There's no `delete` command intentionally. This can be done easily enough though by removing entries or section folders manually.
+
 
 ## Install
 
