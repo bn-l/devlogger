@@ -27,3 +27,6 @@ CODEGUIDE.md
 # OS
 .DS_Store
 Thumbs.db
+
+# devlogger runtime lock files
+.devlogger.lock
