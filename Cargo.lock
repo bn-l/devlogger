@@ -305,6 +305,7 @@ dependencies = [
  "color-eyre",
  "eyre",
  "fs2",
+ "indoc",
  "rmcp",
  "schemars",
  "serde",
@@ -556,6 +557,15 @@ dependencies = [
  "hashbrown 0.17.0",
  "serde",
  "serde_core",
+]
+
+[[package]]
+name = "indoc"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79cf5c93f93228cf8efb3ba362535fb11199ac548a09ce117c9b1adc3030d706"
+dependencies = [
+ "rustversion",
 ]
 
 [[package]]

@@ -24,6 +24,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use indoc::indoc;
 use rmcp::{
     ErrorData as McpError, ServerHandler,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
@@ -74,12 +75,28 @@ impl DevlogServer {
         }
     }
 
-    #[tool(
-        name = "devlog_new",
-        description = "Append a new entry to a section's devlog. Section names must match [a-z]+(-[a-z]+)*. \
-                       Entry text must be single-line. Returns the canonical entry line plus structured fields \
-                       (number, date, text)."
-    )]
+    #[tool(name = "devlog_new")]
+    #[doc = indoc! {"
+        Append a new entry to a section's devlog. Use after a verified fix, feature, or
+        non-trivial change — exactly one entry per change, after the work is done.
+
+        Section names must match `[a-z]+(-[a-z]+)*`: lowercase letters and single hyphens
+        only. No digits, no underscores. Avoid generic catch-alls like `misc`, `general`, or
+        `impl` — they erase the benefit of sectioning. Before creating a new section, call
+        `devlog_sections` or `devlog_list` to see what already exists.
+
+        Entry text must be single-line. Keep it terse — you are writing this for your future
+        self. Useful signal:
+        - What the issue or task was (symptom or root cause).
+        - How you handled it (approach, not code).
+        - What didn't work first, if anything non-obvious.
+        - What resource/doc/file unblocked you, if it was obscure.
+
+        Skip apologies, restating the task, broad project background. The server stamps the
+        number and date itself, so don't include them in the text.
+
+        Returns the canonical entry line plus structured fields (number, date, text).
+    "}]
     pub async fn devlog_new(
         &self,
         Parameters(args): Parameters<NewArgs>,
@@ -99,13 +116,20 @@ impl DevlogServer {
         }
     }
 
-    #[tool(
-        name = "devlog_list",
-        description = "List entries. With a section name, returns only that section's entries. Without one, \
-                       returns every section's entries grouped by section (alphabetical). Structured result is \
-                       either an array of entries or an array of {section, entries} objects; the text result is \
-                       a human-readable summary."
-    )]
+    #[tool(name = "devlog_list")]
+    #[doc = indoc! {"
+        List entries — the workhorse for both browsing and for looking up an entry's number
+        to pass to `devlog_update`. Call this at the start of a task to skim prior context
+        before deciding whether to dive into a specific section with `devlog_read`.
+
+        With a section name, returns only that section's entries. Without one, returns every
+        section's entries grouped by section (alphabetical), each line prefixed with
+        `[<section>] ` in the text summary.
+
+        The text result is a human-readable one-line-per-entry summary; entries longer than
+        ~80 columns are elided with ` (...N more)` — use `devlog_read` if you need the full
+        text.
+    "}]
     pub async fn devlog_list(
         &self,
         Parameters(args): Parameters<ListArgs>,
@@ -160,10 +184,15 @@ impl DevlogServer {
         }
     }
 
-    #[tool(
-        name = "devlog_sections",
-        description = "List all section names in alphabetical order. Empty array if no sections exist yet."
-    )]
+    #[tool(name = "devlog_sections")]
+    #[doc = indoc! {"
+        List all section names in alphabetical order. Empty array if no sections exist yet.
+
+        Useful before creating a new section with `devlog_new` — skim what already exists so
+        you can reuse an existing section rather than opening a redundant one. If you only
+        need the names (not the entries in each section), this is cheaper than `devlog_list`.
+        Do NOT create an empty section just to have one.
+    "}]
     pub async fn devlog_sections(
         &self,
         Parameters(args): Parameters<SectionsArgs>,
@@ -181,12 +210,23 @@ impl DevlogServer {
         }
     }
 
-    #[tool(
-        name = "devlog_update",
-        description = "Rewrite an existing entry's text. `id` is either the entry number (from devlog_list), \
-                       an exact `YYYY-MM-DD HH:MM:SS` timestamp, or a unique date prefix. The entry's number \
-                       and date are preserved; only the text changes."
-    )]
+    #[tool(name = "devlog_update")]
+    #[doc = indoc! {"
+        Rewrite an existing entry's text in place. The entry's number and date are preserved;
+        only the text changes.
+
+        `id` is either the entry number (from `devlog_list`), an exact `YYYY-MM-DD HH:MM:SS`
+        timestamp, or a unique date prefix (e.g. `2026-04-14`).
+
+        Use it to:
+        - Collapse a pre-task plan once the work lands — rewrite the planning entry to a
+          short pointer to the completion entry (e.g. `Successfully completed: see entry 7`
+          or `Failed: see entry 7`). Keeps the log dense and skimmable.
+        - Correct an entry that turned out to be wrong or misleading (e.g. the fix you logged
+          didn't actually hold, or the root cause was something else).
+
+        Don't use for trivial wording tweaks.
+    "}]
     pub async fn devlog_update(
         &self,
         Parameters(args): Parameters<UpdateArgs>,
@@ -208,11 +248,15 @@ impl DevlogServer {
         }
     }
 
-    #[tool(
-        name = "devlog_read",
-        description = "Read a section's devlog. With no `n`, returns the entire file verbatim (including any \
-                       non-entry prose). With `n`, returns just the last `n` entry lines."
-    )]
+    #[tool(name = "devlog_read")]
+    #[doc = indoc! {"
+        Read a section's devlog. With no `n`, returns the entire file verbatim (including any
+        non-entry prose). With `n`, returns just the last `n` entry lines.
+
+        Prefer `devlog_list` for skimming — reach for `devlog_read` when you need entries
+        verbatim (e.g. a row was elided with ` (...N more)` in `devlog_list`, or you want the
+        full section text for context).
+    "}]
     pub async fn devlog_read(
         &self,
         Parameters(args): Parameters<ReadArgs>,
@@ -247,12 +291,34 @@ impl ServerHandler for DevlogServer {
         info.capabilities = ServerCapabilities::builder().enable_tools().build();
         info.server_info = implementation;
         info.instructions = Some(
-            "Append-only markdown devlog. Sections live at \
-             <base>/DEVLOG/<section>/<section>-devlog.md. Use devlog_sections to discover \
-             sections, devlog_list to browse, devlog_new after implementing a change, \
-             devlog_update to rewrite an entry's text, and devlog_read to dump a section. \
-             All tools accept an optional `base_dir` to target a different project root."
-                .into(),
+            indoc! {"
+                Append-only markdown devlog. Every entry belongs to a section — there is no
+                implicit default log, so every `devlog_new`, `devlog_update`, and `devlog_read`
+                requires a section name. Sections live at
+                `<base>/DEVLOG/<section>/<section>-devlog.md`.
+
+                When to use proactively:
+                - Before a hard task: pre-log a detailed plan — what you're going to do and
+                  how. Once the work lands, collapse that entry to a short pointer to the
+                  completion entry via `devlog_update`.
+                - After a verified fix, feature, or non-trivial debug session: log what
+                  happened and how you handled it.
+                - Discovering something new and very important.
+                - Before starting any task: skim prior context with `devlog_list` (all
+                  sections at once), or `devlog_sections` if you just need the section names.
+                  Dive into a specific section with `devlog_read` only if you need the full
+                  text.
+                - Other journal-worthy moments — the devlog is your own working memory across
+                  sessions, not only a changelog.
+
+                When NOT to use:
+                - Trivial one-line changes that add no future value to re-read.
+                - Status updates or messages aimed at the human — this is a journal for
+                  yourself. Nobody else reads it.
+
+                All tools accept an optional `base_dir` to target a different project root.
+            "}
+            .into(),
         );
         info
     }
