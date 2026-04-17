@@ -1,7 +1,7 @@
 //! The [`DevlogServer`] — MCP server adapter exposing the devlogger
 //! library through the Model Context Protocol.
 //!
-//! Each of devlogger's five CLI commands becomes an MCP tool:
+//! Each of devlogger's CLI commands becomes an MCP tool:
 //!
 //! | Tool              | CLI equivalent                                |
 //! |-------------------|-----------------------------------------------|
@@ -10,6 +10,7 @@
 //! | `devlog_sections` | `devlogger sections`                          |
 //! | `devlog_update`   | `devlogger update <section> <id> <text>`      |
 //! | `devlog_read`     | `devlogger read <section> [<n>]`              |
+//! | `devlog_move`     | `devlogger move <from> <id> <to>`             |
 //!
 //! All tools accept an optional `base_dir` argument that overrides the
 //! server's configured default directory on a per-call basis — the same
@@ -34,8 +35,10 @@ use rmcp::{
     tool, tool_handler, tool_router,
 };
 
-use crate::commands::{cmd_list, cmd_list_all, cmd_new, cmd_read, cmd_sections, cmd_update};
-use crate::mcp::args::{ListArgs, NewArgs, ReadArgs, SectionsArgs, UpdateArgs};
+use crate::commands::{
+    cmd_list, cmd_list_all, cmd_move, cmd_new, cmd_read, cmd_sections, cmd_update,
+};
+use crate::mcp::args::{ListArgs, MoveArgs, NewArgs, ReadArgs, SectionsArgs, UpdateArgs};
 use crate::mcp::convert::{EntryJson, SectionEntriesJson, entries_to_json};
 
 /// MCP server wrapping the devlogger library.
@@ -272,6 +275,35 @@ impl DevlogServer {
                 vec![Content::text(contents.clone())],
                 &serde_json::json!({ "contents": contents }),
             ),
+            Err(e) => Ok(tool_error(format_report(&e))),
+        }
+    }
+
+    #[tool(name = "devlog_move")]
+    #[doc = indoc! {"
+        Move an entry from one section to another. The entry's date is preserved; it slots
+        into the destination at its correct chronological position and both sections are
+        renumbered 1..N so number order matches date order.
+
+        Returns the moved entry's new canonical line (new number in the destination) plus
+        structured fields.
+    "}]
+    pub async fn devlog_move(
+        &self,
+        Parameters(args): Parameters<MoveArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        let base = self.resolve_base(args.base_dir.as_deref());
+        let from = args.from_section;
+        let id = args.id;
+        let to = args.to_section;
+        let result = tokio::task::spawn_blocking(move || cmd_move(&base, &from, &id, &to))
+            .await
+            .map_err(join_error)?;
+        match result {
+            Ok(entry) => {
+                let json: EntryJson = (&entry).into();
+                success_with_json(vec![Content::text(entry.to_line())], &json)
+            }
             Err(e) => Ok(tool_error(format_report(&e))),
         }
     }

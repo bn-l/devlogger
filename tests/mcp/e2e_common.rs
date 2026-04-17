@@ -148,6 +148,20 @@ pub async fn call_update(
     .await
 }
 
+pub async fn call_move(
+    client: &RunningService<RoleClient, ClientInfo>,
+    from: &str,
+    id: &str,
+    to: &str,
+) -> CallToolResult {
+    call(
+        client,
+        "devlog_move",
+        json!({ "from_section": from, "id": id, "to_section": to }),
+    )
+    .await
+}
+
 /// Fresh `TempDir` used as the server's `--dir`.
 pub fn fresh_base() -> TempDir {
     tempfile::tempdir().expect("tempdir")

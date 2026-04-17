@@ -6,7 +6,7 @@
 use schemars::schema_for;
 use serde_json::Value;
 
-use devlogger::mcp::args::{ListArgs, NewArgs, ReadArgs, SectionsArgs, UpdateArgs};
+use devlogger::mcp::args::{ListArgs, MoveArgs, NewArgs, ReadArgs, SectionsArgs, UpdateArgs};
 
 fn schema_json<T: schemars::JsonSchema>() -> Value {
     serde_json::to_value(schema_for!(T)).unwrap()
@@ -73,6 +73,21 @@ fn read_args_schema_requires_only_section() {
 
     let props = properties(&s);
     for field in ["section", "n", "base_dir"] {
+        assert!(props.get(field).is_some(), "missing property {field}");
+    }
+}
+
+#[test]
+fn move_args_schema_requires_from_section_id_and_to_section() {
+    let s = schema_json::<MoveArgs>();
+    let req = required(&s);
+    for field in ["from_section", "id", "to_section"] {
+        assert!(req.contains(&field), "missing required field {field}: {req:?}");
+    }
+    assert!(!req.contains(&"base_dir"), "base_dir must be optional");
+
+    let props = properties(&s);
+    for field in ["from_section", "id", "to_section", "base_dir"] {
         assert!(props.get(field).is_some(), "missing property {field}");
     }
 }

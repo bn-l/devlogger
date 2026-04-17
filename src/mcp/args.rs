@@ -59,6 +59,23 @@ pub struct UpdateArgs {
     pub base_dir: Option<String>,
 }
 
+/// Arguments for `devlog_move`.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct MoveArgs {
+    /// Source section (required). Lowercase letters and single hyphens only.
+    pub from_section: String,
+    /// Entry id in the source section: either the entry number (from
+    /// `devlog_list`), an exact `YYYY-MM-DD HH:MM:SS` timestamp, or a
+    /// unique date prefix (e.g. `2026-04-14`).
+    pub id: String,
+    /// Destination section (required). Must differ from `from_section`.
+    /// Created if it doesn't already exist.
+    pub to_section: String,
+    /// Optional override for the directory containing the `DEVLOG/` folder.
+    #[serde(default)]
+    pub base_dir: Option<String>,
+}
+
 /// Arguments for `devlog_read`.
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct ReadArgs {

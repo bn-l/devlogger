@@ -74,4 +74,15 @@ pub enum Command {
         #[arg(required = true, num_args = 1..=2)]
         args: Vec<String>,
     },
+
+    /// Move an entry from one section to another.
+    /// `devlogger move <from-section> <id> <to-section>`
+    ///
+    /// The entry's date is preserved; it's inserted into the destination
+    /// at its correct chronological position.  Both sections are
+    /// renumbered 1..N after the move.
+    Move {
+        #[arg(required = true, num_args = 3)]
+        args: Vec<String>,
+    },
 }

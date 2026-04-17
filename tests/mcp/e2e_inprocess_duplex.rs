@@ -25,6 +25,7 @@ async fn inprocess_handshake_and_tools_list_match_subprocess() {
         names,
         vec![
             "devlog_list",
+            "devlog_move",
             "devlog_new",
             "devlog_read",
             "devlog_sections",

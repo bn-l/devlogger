@@ -121,6 +121,41 @@ async fn update_rejects_multiline_replacement_over_wire() {
 }
 
 #[tokio::test]
+async fn move_missing_source_section_is_tool_error_over_wire() {
+    let base = fresh_base();
+    let client = spawn_subprocess_client(base.path()).await;
+
+    let msg = assert_wire_err(&call_move(&client, "ghost", "1", "dst").await);
+    assert!(msg.contains("not found"), "{msg}");
+    client.cancel().await.ok();
+}
+
+#[tokio::test]
+async fn move_to_same_section_is_tool_error_over_wire() {
+    let base = fresh_base();
+    let client = spawn_subprocess_client(base.path()).await;
+
+    assert_wire_ok(&call_new(&client, "core", "only").await);
+    let msg = assert_wire_err(&call_move(&client, "core", "1", "core").await);
+    assert!(msg.contains("same section"), "{msg}");
+    client.cancel().await.ok();
+}
+
+#[tokio::test]
+async fn move_invalid_dest_section_is_tool_error_over_wire() {
+    let base = fresh_base();
+    let client = spawn_subprocess_client(base.path()).await;
+
+    assert_wire_ok(&call_new(&client, "core", "only").await);
+    let msg = assert_wire_err(&call_move(&client, "core", "1", "BadCase").await);
+    assert!(
+        msg.contains("invalid section") || msg.contains("illegal"),
+        "{msg}"
+    );
+    client.cancel().await.ok();
+}
+
+#[tokio::test]
 async fn missing_required_argument_surfaces_as_protocol_error() {
     // Omitting `text` on `devlog_new` means the JSON payload cannot
     // deserialize into NewArgs — rmcp should reject this at the protocol

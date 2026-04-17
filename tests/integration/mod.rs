@@ -9,6 +9,7 @@ mod file_layout;
 mod help_output;
 mod line_endings;
 mod list_flow;
+mod move_flow;
 mod new_flow;
 mod numbering;
 mod read_flow;

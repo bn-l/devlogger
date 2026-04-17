@@ -50,6 +50,7 @@ async fn every_tool_has_non_empty_description() {
         "devlog_sections",
         "devlog_update",
         "devlog_read",
+        "devlog_move",
     ] {
         let t = &tools[name];
         let desc = t.description.clone().unwrap_or_default();
@@ -123,6 +124,28 @@ async fn devlog_read_schema_requires_only_section() {
     let props = properties(&s);
     for field in ["section", "n", "base_dir"] {
         assert!(props.get(field).is_some(), "missing {field}");
+    }
+}
+
+#[tokio::test]
+async fn devlog_move_schema_requires_from_section_id_to_section() {
+    let base = fresh_base();
+    let tools = listed_by_name(base.path()).await;
+    let s = schema(&tools["devlog_move"]);
+    let req = required(&s);
+    for field in ["from_section", "id", "to_section"] {
+        assert!(req.contains(&field.to_string()), "missing {field}: {req:?}");
+    }
+    assert!(!req.contains(&"base_dir".to_string()));
+
+    let props = properties(&s);
+    for field in ["from_section", "id", "to_section", "base_dir"] {
+        assert!(props.get(field).is_some(), "missing {field}");
+        let desc = props[field]
+            .get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        assert!(!desc.is_empty(), "{field} schema has empty description");
     }
 }
 

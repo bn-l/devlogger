@@ -81,6 +81,7 @@ async fn tools_list_exposes_the_full_devlog_surface() {
         "devlog_sections",
         "devlog_update",
         "devlog_read",
+        "devlog_move",
     ] {
         assert!(
             names.contains(&expected),
@@ -89,7 +90,7 @@ async fn tools_list_exposes_the_full_devlog_surface() {
     }
     assert_eq!(
         tools.len(),
-        5,
+        6,
         "unexpected extra tools; got {:?}",
         tools.iter().map(|t| &t.name).collect::<Vec<_>>()
     );

@@ -9,6 +9,7 @@ mod errors;
 mod registration;
 mod result_shape;
 mod tool_list;
+mod tool_move;
 mod tool_new;
 mod tool_read;
 mod tool_sections;

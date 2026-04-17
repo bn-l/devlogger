@@ -5,7 +5,7 @@ use eyre::Result;
 
 use devlogger::cli::{Cli, Command};
 use devlogger::commands::{
-    cmd_list, cmd_list_all, cmd_new, cmd_read, cmd_sections, cmd_update,
+    cmd_list, cmd_list_all, cmd_move, cmd_new, cmd_read, cmd_sections, cmd_update,
 };
 use devlogger::section::validate_section_name;
 
@@ -59,6 +59,11 @@ fn run(cli: Cli) -> Result<()> {
             let out = cmd_read(&base, &section, n)?;
             print!("{out}");
         }
+        Command::Move { args } => {
+            let (from, id, to) = split_move_args(args)?;
+            let entry = cmd_move(&base, &from, &id, &to)?;
+            println!("{}", entry.to_line());
+        }
     }
     Ok(())
 }
@@ -80,6 +85,17 @@ fn split_update_args(args: Vec<String>) -> Result<(String, String, String)> {
     let text = it.next().expect("clap enforces exactly 3 args");
     validate_section_name(&section)?;
     Ok((section, id, text))
+}
+
+fn split_move_args(args: Vec<String>) -> Result<(String, String, String)> {
+    // clap guarantees exactly 3
+    let mut it = args.into_iter();
+    let from = it.next().expect("clap enforces exactly 3 args");
+    let id = it.next().expect("clap enforces exactly 3 args");
+    let to = it.next().expect("clap enforces exactly 3 args");
+    validate_section_name(&from)?;
+    validate_section_name(&to)?;
+    Ok((from, id, to))
 }
 
 fn split_read_args(args: Vec<String>) -> Result<(String, Option<usize>)> {

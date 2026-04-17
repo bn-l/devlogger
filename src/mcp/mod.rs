@@ -8,6 +8,6 @@ pub mod args;
 pub mod convert;
 pub mod server;
 
-pub use args::{ListArgs, NewArgs, ReadArgs, SectionsArgs, UpdateArgs};
+pub use args::{ListArgs, MoveArgs, NewArgs, ReadArgs, SectionsArgs, UpdateArgs};
 pub use convert::{EntryJson, SectionEntriesJson, entries_to_json};
 pub use server::DevlogServer;

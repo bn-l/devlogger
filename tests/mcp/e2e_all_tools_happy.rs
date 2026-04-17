@@ -163,6 +163,43 @@ async fn devlog_update_over_wire_preserves_number_and_date() {
 }
 
 #[tokio::test]
+async fn devlog_move_over_wire_relocates_entry_and_preserves_date() {
+    let base = fresh_base();
+    let client = spawn_subprocess_client(base.path()).await;
+
+    // Seed the source with two entries so after the move the source still
+    // has content to re-number.
+    let from_path = section_file(base.path(), "src");
+    std::fs::create_dir_all(from_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &from_path,
+        "- 1 | 2026-04-10 09:00:00: stays\n\
+         - 2 | 2026-04-12 11:22:33: moving\n",
+    )
+    .unwrap();
+
+    let result = call_move(&client, "src", "2", "dst").await;
+    assert_wire_ok(&result);
+    let s = structured(&result);
+    assert_eq!(s.get("number").and_then(|v| v.as_u64()), Some(1));
+    assert_eq!(s.get("text").and_then(|v| v.as_str()), Some("moving"));
+    assert_eq!(
+        s.get("date").and_then(|v| v.as_str()),
+        Some("2026-04-12 11:22:33")
+    );
+
+    let dst_contents = std::fs::read_to_string(section_file(base.path(), "dst")).unwrap();
+    assert!(dst_contents.contains(": moving"));
+    assert!(dst_contents.contains("2026-04-12 11:22:33"));
+
+    let src_contents = std::fs::read_to_string(&from_path).unwrap();
+    assert!(src_contents.contains(": stays"));
+    assert!(!src_contents.contains(": moving"));
+
+    client.cancel().await.ok();
+}
+
+#[tokio::test]
 async fn devlog_new_via_wire_with_explicit_base_dir_argument() {
     let default_base = fresh_base();
     let override_base = fresh_base();

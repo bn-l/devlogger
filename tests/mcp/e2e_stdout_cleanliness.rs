@@ -87,7 +87,7 @@ async fn every_line_on_stdout_is_a_valid_jsonrpc_frame_even_with_rust_log_trace(
     assert_eq!(resp2["jsonrpc"], "2.0");
     assert_eq!(resp2["id"], 2);
     let tools = resp2["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 5);
+    assert_eq!(tools.len(), 6);
 
     // 4. tools/call devlog_new
     let call = json!({

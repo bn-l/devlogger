@@ -191,6 +191,214 @@ pub fn cmd_update(
     Ok(Entry::new(target.number, target.date, new_text))
 }
 
+/// Move an entry from one section to another.  The entry's date is
+/// preserved; it is inserted into the destination at its correct
+/// chronological position and both sections are renumbered 1..N so that
+/// number order matches file (and for the common append-only case, date)
+/// order.  Crash safety: the destination is written first (so a crash
+/// mid-operation leaves a duplicate, which is visible and fixable, rather
+/// than silently losing the entry).  The returned [`Entry`] reflects the
+/// entry's new number in the destination.
+pub fn cmd_move(
+    base: &Path,
+    from_section: &str,
+    id: &str,
+    to_section: &str,
+) -> Result<Entry> {
+    validate_section_name(from_section)?;
+    validate_section_name(to_section)?;
+    if from_section == to_section {
+        bail!(
+            "cannot move within the same section (`{from_section}`); \
+             use `update` if you want to rewrite an entry's text"
+        );
+    }
+    let from_path = section_devlog_path(base, from_section);
+    let to_path = section_devlog_path(base, to_section);
+    if !from_path.exists() {
+        bail!("devlog not found: {}", from_path.display());
+    }
+
+    // Lock both sections, acquiring in alphabetical order so two
+    // concurrent moves in opposite directions can never deadlock.
+    let (_first_lock, _second_lock) = if from_section < to_section {
+        let a = acquire_lock_for(&from_path)?;
+        let b = acquire_lock_for(&to_path)?;
+        (a, b)
+    } else {
+        let b = acquire_lock_for(&to_path)?;
+        let a = acquire_lock_for(&from_path)?;
+        (a, b)
+    };
+
+    let from_contents = read_contents(&from_path)?;
+    let from_entries = parse_file(&from_path, &from_contents)?;
+    let target_idx = resolve_target(&from_entries, id)?;
+    let moved = from_entries[target_idx].clone();
+
+    let to_contents = if to_path.exists() {
+        read_contents(&to_path)?
+    } else {
+        String::new()
+    };
+    let to_entries = parse_file(&to_path, &to_contents)?;
+
+    // Insertion point in dest = first existing entry whose date is
+    // strictly greater than the moved entry's.  Ties break toward
+    // "after", so moves of same-second entries are stable.
+    let insertion_pos = to_entries
+        .iter()
+        .position(|e| e.date > moved.date)
+        .unwrap_or(to_entries.len());
+
+    let new_to_contents =
+        build_contents_with_insert(&to_contents, &to_entries, insertion_pos, &moved);
+    let new_from_contents =
+        build_contents_without_target(&from_contents, &from_entries, target_idx);
+
+    // Dest first (add), then source (remove): crash between writes
+    // leaves a duplicate, which is visible and recoverable.
+    rewrite_file(&to_path, &new_to_contents)
+        .wrap_err_with(|| format!("failed to rewrite {}", to_path.display()))?;
+    rewrite_file(&from_path, &new_from_contents)
+        .wrap_err_with(|| format!("failed to rewrite {}", from_path.display()))?;
+
+    let new_number = (insertion_pos as u32) + 1;
+    Ok(Entry::new(new_number, moved.date, moved.text))
+}
+
+/// Build the destination file contents with `moved` inserted at
+/// `insertion_pos` (0-based index among existing entries).  All entries
+/// are renumbered 1..N by their file-position order, so number order
+/// matches file order after the move.  Prose, headings, blank lines, and
+/// the file's original line-ending style are preserved.
+fn build_contents_with_insert(
+    contents: &str,
+    entries: &[Entry],
+    insertion_pos: usize,
+    moved: &Entry,
+) -> String {
+    let line_ending = detect_line_ending(contents);
+
+    // Empty/degenerate file: the moved entry becomes the sole entry.
+    if entries.is_empty() {
+        let line = format_entry_line(1, moved);
+        if contents.is_empty() {
+            return format!("{line}{line_ending}");
+        }
+        // File has prose but no entries — append the moved entry after
+        // the existing prose, preserving the file's trailing-newline
+        // policy.
+        let mut out = contents.to_string();
+        if !out.ends_with('\n') {
+            out.push_str(line_ending);
+        }
+        out.push_str(&line);
+        out.push_str(line_ending);
+        if !contents.ends_with('\n') {
+            out.truncate(out.len() - line_ending.len());
+        }
+        return out;
+    }
+
+    let trailing_newline = contents.ends_with('\n');
+    let lines: Vec<&str> = contents.lines().collect();
+    let last_entry_line_idx = lines
+        .iter()
+        .rposition(|l| l.starts_with("- "))
+        .expect("entries.is_empty() handled above");
+
+    let mut out = String::with_capacity(contents.len() + 64);
+    let mut existing_seen = 0usize;
+    let mut next_number: u32 = 1;
+    let mut inserted = false;
+
+    for (i, line) in lines.iter().enumerate() {
+        if line.starts_with("- ") {
+            // Insert BEFORE this entry line if it's the insertion point.
+            if !inserted && existing_seen == insertion_pos {
+                out.push_str(&format_entry_line(next_number, moved));
+                out.push_str(line_ending);
+                next_number += 1;
+                inserted = true;
+            }
+            out.push_str(&format_entry_line(next_number, &entries[existing_seen]));
+            out.push_str(line_ending);
+            next_number += 1;
+            existing_seen += 1;
+        } else {
+            out.push_str(line);
+            out.push_str(line_ending);
+        }
+
+        // Insert AFTER the last entry line if we still haven't placed
+        // the new entry (i.e. insertion_pos == entries.len()).
+        if !inserted && i == last_entry_line_idx {
+            out.push_str(&format_entry_line(next_number, moved));
+            out.push_str(line_ending);
+            next_number += 1;
+            inserted = true;
+        }
+    }
+
+    debug_assert!(inserted, "insertion point never reached");
+
+    if !trailing_newline && out.ends_with(line_ending) {
+        out.truncate(out.len() - line_ending.len());
+    }
+    out
+}
+
+/// Build the source file contents with the entry at `target_idx` removed.
+/// Remaining entries are renumbered 1..N by file-position order (no
+/// gaps).  Prose and line endings are preserved.
+fn build_contents_without_target(
+    contents: &str,
+    entries: &[Entry],
+    target_idx: usize,
+) -> String {
+    let line_ending = detect_line_ending(contents);
+    let trailing_newline = contents.ends_with('\n');
+
+    let mut out = String::with_capacity(contents.len());
+    let mut existing_seen = 0usize;
+    let mut next_number: u32 = 1;
+    let mut removed = false;
+
+    for line in contents.lines() {
+        if line.starts_with("- ") {
+            if existing_seen == target_idx {
+                existing_seen += 1;
+                removed = true;
+                continue;
+            }
+            out.push_str(&format_entry_line(next_number, &entries[existing_seen]));
+            out.push_str(line_ending);
+            next_number += 1;
+            existing_seen += 1;
+        } else {
+            out.push_str(line);
+            out.push_str(line_ending);
+        }
+    }
+
+    debug_assert!(removed, "target index {target_idx} never encountered");
+
+    if !trailing_newline && out.ends_with(line_ending) {
+        out.truncate(out.len() - line_ending.len());
+    }
+    out
+}
+
+fn format_entry_line(number: u32, entry: &Entry) -> String {
+    format!(
+        "- {} | {}: {}",
+        number,
+        entry.date.format(DATE_FORMAT),
+        entry.text,
+    )
+}
+
 /// Read the devlog.  `n = None` dumps the whole file verbatim.  `n =
 /// Some(k)` dumps the last `k` entry lines (prose lines are skipped).
 pub fn cmd_read(base: &Path, section: &str, n: Option<usize>) -> Result<String> {
