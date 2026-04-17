@@ -1,4 +1,4 @@
-use devlogger::entry::validate_entry_text;
+use devlogger::entry::{MAX_ENTRY_COLS, validate_entry_text};
 
 #[test]
 fn accepts_empty_text() {
@@ -73,4 +73,37 @@ fn rejects_control_characters() {
             "U+{code:04X} should be rejected"
         );
     }
+}
+
+#[test]
+fn accepts_text_just_under_limit() {
+    let s = "a".repeat(MAX_ENTRY_COLS - 1);
+    assert!(validate_entry_text(&s).is_ok());
+}
+
+#[test]
+fn accepts_text_at_exact_limit() {
+    let s = "a".repeat(MAX_ENTRY_COLS);
+    assert!(validate_entry_text(&s).is_ok());
+}
+
+#[test]
+fn rejects_text_one_column_over_limit() {
+    let s = "a".repeat(MAX_ENTRY_COLS + 1);
+    let err = validate_entry_text(&s).unwrap_err().to_string();
+    assert!(err.contains("too long"), "unexpected: {err}");
+    assert!(err.contains(&MAX_ENTRY_COLS.to_string()), "should mention limit: {err}");
+    assert!(err.contains("concise"), "should tell the user what to do: {err}");
+}
+
+#[test]
+fn wide_glyphs_count_as_two_columns_for_length_limit() {
+    // Each CJK glyph counts as 2 cols; `MAX_ENTRY_COLS / 2` glyphs == the
+    // limit exactly, one more puts us over.
+    let at_limit = "漢".repeat(MAX_ENTRY_COLS / 2);
+    assert!(validate_entry_text(&at_limit).is_ok());
+
+    let over = "漢".repeat(MAX_ENTRY_COLS / 2 + 1);
+    let err = validate_entry_text(&over).unwrap_err().to_string();
+    assert!(err.contains("too long"), "unexpected: {err}");
 }

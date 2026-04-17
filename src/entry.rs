@@ -15,8 +15,17 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 /// Date format used in entry lines.
 pub const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
+/// Maximum display-width (in terminal columns, counting wide glyphs as 2)
+/// allowed for a single entry's text.  Chosen to be generous enough for a
+/// detailed one-liner but tight enough to nudge users toward terse logs —
+/// if you need more than this, a design doc or commit message is the
+/// right home for the detail.
+pub const MAX_ENTRY_COLS: usize = 500;
+
 /// Reject entry text that would break the single-line format: no newlines,
-/// no carriage returns, and no control characters other than tab.
+/// no carriage returns, and no control characters other than tab.  Also
+/// rejects text wider than [`MAX_ENTRY_COLS`] terminal columns, so entries
+/// stay skimmable and the devlog doesn't drift into prose.
 pub fn validate_entry_text(text: &str) -> Result<()> {
     for (i, ch) in text.char_indices() {
         match ch {
@@ -28,6 +37,14 @@ pub fn validate_entry_text(text: &str) -> Result<()> {
             ),
             _ => {}
         }
+    }
+    let cols = text.width();
+    if cols > MAX_ENTRY_COLS {
+        bail!(
+            "entry too long: {cols} columns (limit is {MAX_ENTRY_COLS}). Be more concise — \
+             devlog entries are one-line summaries. If you need more detail, put it in a \
+             design doc, commit message, or split it across multiple entries."
+        );
     }
     Ok(())
 }

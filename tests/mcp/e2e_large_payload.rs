@@ -58,14 +58,16 @@ async fn many_entries_round_trip_over_wire() {
 }
 
 #[tokio::test]
-async fn single_large_entry_text_round_trips_intact() {
-    // A 64 KiB single-line entry exercises JSON-RPC framing at both ends.
-    // If any buffer along the way truncates mid-frame, the server either
-    // rejects the request or returns corrupt data.
+async fn single_max_length_entry_text_round_trips_intact() {
+    // Entries are capped at `MAX_ENTRY_COLS` columns.  This exercises
+    // JSON-RPC framing with the largest single entry the server will
+    // accept — enough to tickle any buffering bug on either side.  For
+    // aggregate large-frame stress beyond one entry, see
+    // `many_entries_round_trip_over_wire`.
     let base = fresh_base();
     let client = spawn_subprocess_client(base.path()).await;
 
-    let big: String = "abcdefghij".repeat(6554); // 65 540 bytes, single line
+    let big: String = "a".repeat(devlogger::entry::MAX_ENTRY_COLS);
     let created = call(
         &client,
         "devlog_new",

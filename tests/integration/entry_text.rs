@@ -80,3 +80,38 @@ fn update_rejects_entry_with_carriage_return() {
     assert_ne!(code, 0);
     assert!(stderr.contains("carriage return"), "stderr: {stderr}");
 }
+
+#[test]
+fn new_rejects_entry_exceeding_length_limit() {
+    let dir = tempfile::tempdir().unwrap();
+    let long = "a".repeat(devlogger::entry::MAX_ENTRY_COLS + 1);
+    let (code, _, stderr) = run(dir.path(), &["new", "main", &long]);
+    assert_ne!(code, 0);
+    assert!(stderr.contains("too long"), "stderr: {stderr}");
+    assert!(stderr.contains("concise"), "stderr should tell user what to do: {stderr}");
+    // File must not have been touched.
+    assert!(!section_devlog(dir.path(), "main").exists());
+}
+
+#[test]
+fn update_rejects_entry_exceeding_length_limit() {
+    let dir = tempfile::tempdir().unwrap();
+    run_ok(dir.path(), &["new", "main", "original"]);
+    let long = "a".repeat(devlogger::entry::MAX_ENTRY_COLS + 1);
+    let (code, _, stderr) = run(dir.path(), &["update", "main", "1", &long]);
+    assert_ne!(code, 0);
+    assert!(stderr.contains("too long"), "stderr: {stderr}");
+
+    // Original file unchanged.
+    let contents = std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
+    assert!(contents.contains(": original"));
+}
+
+#[test]
+fn new_accepts_entry_exactly_at_length_limit() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = "a".repeat(devlogger::entry::MAX_ENTRY_COLS);
+    run_ok(dir.path(), &["new", "main", &s]);
+    let contents = std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
+    assert!(contents.contains(&s));
+}

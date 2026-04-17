@@ -29,9 +29,10 @@ fn whitespace_only_entry_text_is_accepted_and_preserved() {
 }
 
 #[test]
-fn very_long_entry_text_is_accepted() {
+fn long_entry_text_at_limit_is_accepted() {
     let dir = tempfile::tempdir().unwrap();
-    let long = "x".repeat(50_000);
+    // Exactly at the length limit — must still round-trip to disk.
+    let long = "x".repeat(devlogger::entry::MAX_ENTRY_COLS);
     run_ok(dir.path(), &["new", "main", &long]);
     // `list` truncates each row to 80 chars; verify the full text is
     // stored on disk and retrievable verbatim via `read`.
