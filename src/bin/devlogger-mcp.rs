@@ -62,7 +62,12 @@ fn main() -> ExitCode {
         },
     };
 
-    tracing::info!(base = %base.display(), "devlogger-mcp starting");
+    // Gated at debug: stdio MCP hosts surface stderr as a connection
+    // log line (Claude Code writes `{"error":"Server stderr: …"}` per
+    // byte).  A startup banner on every reconnect is pure noise for
+    // the user and burns a slot in the host's log buffer.  Users who
+    // want the banner can set `RUST_LOG=devlogger_mcp=debug`.
+    tracing::debug!(base = %base.display(), "devlogger-mcp starting");
 
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()

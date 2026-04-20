@@ -29,3 +29,4 @@ mod e2e_large_payload;
 mod e2e_lifecycle;
 mod e2e_schemas;
 mod e2e_stdout_cleanliness;
+mod e2e_timing;

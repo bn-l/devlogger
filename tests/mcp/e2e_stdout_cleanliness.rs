@@ -143,12 +143,16 @@ async fn every_line_on_stdout_is_a_valid_jsonrpc_frame_even_with_rust_log_trace(
 }
 
 #[tokio::test]
-async fn startup_info_log_goes_to_stderr_not_stdout() {
+async fn startup_log_goes_to_stderr_not_stdout_when_enabled() {
+    // The startup banner is gated at `debug` — only visible when the
+    // user explicitly opts in via `RUST_LOG`.  When it IS emitted it
+    // must still go to stderr (never stdout, which is the JSON-RPC
+    // channel).  A sibling test asserts the default is fully silent.
     let dir = tempfile::tempdir().unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_devlogger-mcp"))
         .arg("--dir")
         .arg(dir.path())
-        .env("RUST_LOG", "info")
+        .env("RUST_LOG", "devlogger_mcp=debug")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -219,6 +223,71 @@ async fn startup_info_log_goes_to_stderr_not_stdout() {
             panic!("stdout line {idx} not valid JSON-RPC: {e}: {trimmed:?}")
         });
     }
+}
+
+#[tokio::test]
+async fn default_startup_has_no_banner_on_stderr() {
+    // Claude Code 2.1.x logs every stderr byte as a "Server stderr"
+    // line in the MCP connection log.  An INFO-level banner on each
+    // launch was polluting those logs and making real errors harder
+    // to spot, so the banner now lives behind `RUST_LOG=debug`.
+    //
+    // Note: the claude-code-race workaround (see
+    // `src/mcp/claude_code_race_workaround.rs`) intentionally emits
+    // a `warn!` on every initialize — that IS allowed to appear, and
+    // appearing is the point: it self-advertises so the workaround
+    // can't be quietly forgotten.  This test just guards the generic
+    // startup banner.
+    let dir = tempfile::tempdir().unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_devlogger-mcp"))
+        .arg("--dir")
+        .arg(dir.path())
+        .env_remove("RUST_LOG")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+
+    let mut stdin = child.stdin.take().unwrap();
+    let stdout_pipe = child.stdout.take().unwrap();
+    let mut stderr_pipe = child.stderr.take().unwrap();
+    let mut stdout_reader = BufReader::new(stdout_pipe);
+
+    // Drive a full initialize round-trip so we know the server
+    // reached `serve(stdio())` — any startup log would already have
+    // been emitted by this point.
+    let init = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": { "name": "silence-test", "version": "0" }
+        }
+    });
+    stdin
+        .write_all(format!("{init}\n").as_bytes())
+        .await
+        .unwrap();
+    let _ = read_line(&mut stdout_reader).await;
+
+    drop(stdin);
+    let _ = timeout(Duration::from_secs(5), child.wait()).await;
+    let _ = child.kill().await;
+
+    let mut stderr_all = String::new();
+    let _ = timeout(
+        Duration::from_secs(2),
+        stderr_pipe.read_to_string(&mut stderr_all),
+    )
+    .await;
+
+    assert!(
+        !stderr_all.contains("devlogger-mcp starting"),
+        "startup banner leaked to stderr on a default launch: {stderr_all:?}"
+    );
 }
 
 #[tokio::test]

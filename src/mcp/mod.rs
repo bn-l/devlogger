@@ -5,6 +5,7 @@
 //! [`server::DevlogServer`] for the main entry point.
 
 pub mod args;
+pub mod claude_code_race_workaround;
 pub mod convert;
 pub mod server;
 

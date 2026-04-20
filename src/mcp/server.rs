@@ -27,11 +27,13 @@ use std::sync::Arc;
 
 use indoc::indoc;
 use rmcp::{
-    ErrorData as McpError, ServerHandler,
+    ErrorData as McpError, RoleServer, ServerHandler,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{
-        CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo,
+        CallToolResult, Content, Implementation, InitializeRequestParams, InitializeResult,
+        ServerCapabilities, ServerInfo,
     },
+    service::RequestContext,
     tool, tool_handler, tool_router,
 };
 
@@ -311,6 +313,24 @@ impl DevlogServer {
 
 #[tool_handler]
 impl ServerHandler for DevlogServer {
+    // ⚠️  See `crate::mcp::claude_code_race_workaround` for the full
+    // story.  Briefly: Claude Code 2.1.x has a race that drops the
+    // first post-initialize `tools/list` response for fast stdio
+    // servers; we stall `initialize` by ~1.2 s to match the latency
+    // of MCP servers that don't trigger the bug.  Delete this override
+    // (and the module) when upstream is fixed.
+    async fn initialize(
+        &self,
+        request: InitializeRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<InitializeResult, McpError> {
+        crate::mcp::claude_code_race_workaround::stall_initialize().await;
+        if context.peer.peer_info().is_none() {
+            context.peer.set_peer_info(request);
+        }
+        Ok(self.get_info())
+    }
+
     fn get_info(&self) -> ServerInfo {
         // ServerInfo and Implementation are `#[non_exhaustive]`, so the
         // struct-literal shorthand doesn't work from outside the crate —
