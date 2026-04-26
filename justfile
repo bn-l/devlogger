@@ -1,2 +1,2 @@
-test:
-    cargo test -- --test-threads=1
+test *filter:
+    cargo test {{ if filter == "" { "" } else { filter } }} -- --test-threads=1
