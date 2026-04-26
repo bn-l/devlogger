@@ -40,8 +40,28 @@ use rmcp::{
 use crate::commands::{
     cmd_list, cmd_list_all, cmd_move, cmd_new, cmd_read, cmd_sections, cmd_update,
 };
+use crate::entry::DATE_FORMAT;
 use crate::mcp::args::{ListArgs, MoveArgs, NewArgs, ReadArgs, SectionsArgs, UpdateArgs};
 use crate::mcp::convert::{EntryJson, SectionEntriesJson, entries_to_json};
+
+/// Result class for structured log output — keeps the full entry text
+/// out of the log while still recording what happened.
+#[derive(Debug, Clone, Copy)]
+enum ResultClass {
+    Success,
+    ToolError,
+    ProtocolError,
+}
+
+impl std::fmt::Display for ResultClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Success => f.write_str("success"),
+            Self::ToolError => f.write_str("tool_error"),
+            Self::ProtocolError => f.write_str("protocol_error"),
+        }
+    }
+}
 
 /// MCP server wrapping the devlogger library.
 ///
@@ -100,24 +120,41 @@ impl DevlogServer {
         Skip apologies, restating the task, broad project background. The server stamps the
         number and date itself, so don't include them in the text.
 
-        Returns the canonical entry line plus structured fields (number, date, text).
+        Returns the new entry's number and date plus a confirmation message.
     "}]
     pub async fn devlog_new(
         &self,
         Parameters(args): Parameters<NewArgs>,
     ) -> Result<CallToolResult, McpError> {
+        let started = std::time::Instant::now();
         let base = self.resolve_base(args.base_dir.as_deref());
         let section = args.section;
         let text = args.text;
         let result = tokio::task::spawn_blocking(move || cmd_new(&base, &section, &text))
             .await
-            .map_err(join_error)?;
+            .map_err(|e| {
+                log_tool_call("devlog_new", started.elapsed(), ResultClass::ProtocolError);
+                join_error(e)
+            })?;
         match result {
             Ok(entry) => {
-                let json: EntryJson = (&entry).into();
-                success_with_json(vec![Content::text(entry.to_line())], &json)
+                log_tool_call("devlog_new", started.elapsed(), ResultClass::Success);
+                let date = entry.date.format(DATE_FORMAT).to_string();
+                let message = format!(
+                    "Devlog entry #{} successfully created on {}",
+                    entry.number, date,
+                );
+                let json = serde_json::json!({
+                    "number": entry.number,
+                    "date": date,
+                    "message": message,
+                });
+                success_with_json(vec![Content::text(message.clone())], &json)
             }
-            Err(e) => Ok(tool_error(format_report(&e))),
+            Err(e) => {
+                log_tool_call("devlog_new", started.elapsed(), ResultClass::ToolError);
+                Ok(tool_error(format_report(&e)))
+            }
         }
     }
 
@@ -139,14 +176,19 @@ impl DevlogServer {
         &self,
         Parameters(args): Parameters<ListArgs>,
     ) -> Result<CallToolResult, McpError> {
+        let started = std::time::Instant::now();
         let base = self.resolve_base(args.base_dir.as_deref());
         match args.section {
             Some(section) => {
                 let result = tokio::task::spawn_blocking(move || cmd_list(&base, &section))
                     .await
-                    .map_err(join_error)?;
+                    .map_err(|e| {
+                        log_tool_call("devlog_list", started.elapsed(), ResultClass::ProtocolError);
+                        join_error(e)
+                    })?;
                 match result {
                     Ok(entries) => {
+                        log_tool_call("devlog_list", started.elapsed(), ResultClass::Success);
                         let json = entries_to_json(&entries);
                         let summary = entries
                             .iter()
@@ -155,15 +197,22 @@ impl DevlogServer {
                             .join("\n");
                         success_with_json(vec![Content::text(summary)], &json)
                     }
-                    Err(e) => Ok(tool_error(format_report(&e))),
+                    Err(e) => {
+                        log_tool_call("devlog_list", started.elapsed(), ResultClass::ToolError);
+                        Ok(tool_error(format_report(&e)))
+                    }
                 }
             }
             None => {
                 let result = tokio::task::spawn_blocking(move || cmd_list_all(&base))
                     .await
-                    .map_err(join_error)?;
+                    .map_err(|e| {
+                        log_tool_call("devlog_list", started.elapsed(), ResultClass::ProtocolError);
+                        join_error(e)
+                    })?;
                 match result {
                     Ok(groups) => {
+                        log_tool_call("devlog_list", started.elapsed(), ResultClass::Success);
                         let json: Vec<SectionEntriesJson> = groups
                             .iter()
                             .map(|(name, entries)| SectionEntriesJson {
@@ -183,7 +232,10 @@ impl DevlogServer {
                         }
                         success_with_json(vec![Content::text(summary)], &json)
                     }
-                    Err(e) => Ok(tool_error(format_report(&e))),
+                    Err(e) => {
+                        log_tool_call("devlog_list", started.elapsed(), ResultClass::ToolError);
+                        Ok(tool_error(format_report(&e)))
+                    }
                 }
             }
         }
@@ -202,16 +254,24 @@ impl DevlogServer {
         &self,
         Parameters(args): Parameters<SectionsArgs>,
     ) -> Result<CallToolResult, McpError> {
+        let started = std::time::Instant::now();
         let base = self.resolve_base(args.base_dir.as_deref());
         let result = tokio::task::spawn_blocking(move || cmd_sections(&base))
             .await
-            .map_err(join_error)?;
+            .map_err(|e| {
+                log_tool_call("devlog_sections", started.elapsed(), ResultClass::ProtocolError);
+                join_error(e)
+            })?;
         match result {
             Ok(names) => {
+                log_tool_call("devlog_sections", started.elapsed(), ResultClass::Success);
                 let text = names.join("\n");
                 success_with_json(vec![Content::text(text)], &names)
             }
-            Err(e) => Ok(tool_error(format_report(&e))),
+            Err(e) => {
+                log_tool_call("devlog_sections", started.elapsed(), ResultClass::ToolError);
+                Ok(tool_error(format_report(&e)))
+            }
         }
     }
 
@@ -236,6 +296,7 @@ impl DevlogServer {
         &self,
         Parameters(args): Parameters<UpdateArgs>,
     ) -> Result<CallToolResult, McpError> {
+        let started = std::time::Instant::now();
         let base = self.resolve_base(args.base_dir.as_deref());
         let section = args.section;
         let id = args.id;
@@ -243,13 +304,20 @@ impl DevlogServer {
         let result =
             tokio::task::spawn_blocking(move || cmd_update(&base, &section, &id, &text))
                 .await
-                .map_err(join_error)?;
+                .map_err(|e| {
+                    log_tool_call("devlog_update", started.elapsed(), ResultClass::ProtocolError);
+                    join_error(e)
+                })?;
         match result {
             Ok(entry) => {
+                log_tool_call("devlog_update", started.elapsed(), ResultClass::Success);
                 let json: EntryJson = (&entry).into();
                 success_with_json(vec![Content::text(entry.to_line())], &json)
             }
-            Err(e) => Ok(tool_error(format_report(&e))),
+            Err(e) => {
+                log_tool_call("devlog_update", started.elapsed(), ResultClass::ToolError);
+                Ok(tool_error(format_report(&e)))
+            }
         }
     }
 
@@ -266,18 +334,28 @@ impl DevlogServer {
         &self,
         Parameters(args): Parameters<ReadArgs>,
     ) -> Result<CallToolResult, McpError> {
+        let started = std::time::Instant::now();
         let base = self.resolve_base(args.base_dir.as_deref());
         let section = args.section;
         let n = args.n;
         let result = tokio::task::spawn_blocking(move || cmd_read(&base, &section, n))
             .await
-            .map_err(join_error)?;
+            .map_err(|e| {
+                log_tool_call("devlog_read", started.elapsed(), ResultClass::ProtocolError);
+                join_error(e)
+            })?;
         match result {
-            Ok(contents) => success_with_json(
-                vec![Content::text(contents.clone())],
-                &serde_json::json!({ "contents": contents }),
-            ),
-            Err(e) => Ok(tool_error(format_report(&e))),
+            Ok(contents) => {
+                log_tool_call("devlog_read", started.elapsed(), ResultClass::Success);
+                success_with_json(
+                    vec![Content::text(contents.clone())],
+                    &serde_json::json!({ "contents": contents }),
+                )
+            }
+            Err(e) => {
+                log_tool_call("devlog_read", started.elapsed(), ResultClass::ToolError);
+                Ok(tool_error(format_report(&e)))
+            }
         }
     }
 
@@ -294,19 +372,27 @@ impl DevlogServer {
         &self,
         Parameters(args): Parameters<MoveArgs>,
     ) -> Result<CallToolResult, McpError> {
+        let started = std::time::Instant::now();
         let base = self.resolve_base(args.base_dir.as_deref());
         let from = args.from_section;
         let id = args.id;
         let to = args.to_section;
         let result = tokio::task::spawn_blocking(move || cmd_move(&base, &from, &id, &to))
             .await
-            .map_err(join_error)?;
+            .map_err(|e| {
+                log_tool_call("devlog_move", started.elapsed(), ResultClass::ProtocolError);
+                join_error(e)
+            })?;
         match result {
             Ok(entry) => {
+                log_tool_call("devlog_move", started.elapsed(), ResultClass::Success);
                 let json: EntryJson = (&entry).into();
                 success_with_json(vec![Content::text(entry.to_line())], &json)
             }
-            Err(e) => Ok(tool_error(format_report(&e))),
+            Err(e) => {
+                log_tool_call("devlog_move", started.elapsed(), ResultClass::ToolError);
+                Ok(tool_error(format_report(&e)))
+            }
         }
     }
 }
@@ -407,4 +493,17 @@ fn success_with_json<T: serde::Serialize>(
 /// rather than getting a protocol-level failure that aborts the request.
 fn tool_error(msg: String) -> CallToolResult {
     CallToolResult::error(vec![Content::text(msg)])
+}
+
+/// Emit a structured log event for a completed tool call.  Deliberately
+/// omits request payloads (entry text, section contents) — the log is
+/// for diagnosing transport and timing issues, not auditing content.
+fn log_tool_call(tool: &str, elapsed: std::time::Duration, result: ResultClass) {
+    tracing::info!(
+        tool,
+        elapsed_ms = elapsed.as_millis() as u64,
+        result = %result,
+        pid = std::process::id(),
+        "tool call completed",
+    );
 }

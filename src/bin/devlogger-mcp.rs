@@ -12,10 +12,12 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::Mutex;
 
 use clap::Parser;
 use rmcp::{ServiceExt, transport::stdio};
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::layer::SubscriberExt;
 
 use devlogger::mcp::DevlogServer;
 
@@ -27,7 +29,9 @@ use devlogger::mcp::DevlogServer;
     long_about = "Exposes the devlogger commands (new, list, sections, update, read) as MCP tools over a \
                   stdio transport. Typically spawned by an MCP-capable host (Claude Desktop, Claude Code, \
                   Cursor). The host sends JSON-RPC 2.0 on stdin and receives responses on stdout; stderr \
-                  is free for diagnostic logging (set RUST_LOG=devlogger_mcp=debug for verbose output)."
+                  is free for diagnostic logging (set RUST_LOG=devlogger_mcp=debug for verbose output).\n\n\
+                  Server logs are written as JSONL to ~/.local/share/devlogger/logs/mcp-server.<date>.\n\
+                  Override the log directory with DEVLOGGER_LOG_DIR."
 )]
 struct Args {
     /// Default directory that contains (or will contain) `DEVLOG/`.
@@ -37,17 +41,58 @@ struct Args {
     dir: Option<PathBuf>,
 }
 
+/// Build the log directory path.  `DEVLOGGER_LOG_DIR` takes priority,
+/// then `$HOME/.local/share/devlogger/logs`.  Returns `None` if neither
+/// is set.
+fn log_dir() -> Option<PathBuf> {
+    if let Some(d) = std::env::var_os("DEVLOGGER_LOG_DIR") {
+        return Some(PathBuf::from(d));
+    }
+    std::env::var_os("HOME").map(|h| {
+        PathBuf::from(h)
+            .join(".local/share/devlogger/logs")
+    })
+}
+
+/// Try to open (or create) today's log file in append mode.  Returns
+/// `None` on any failure — the server must never crash because of
+/// logging.
+fn open_log_file() -> Option<std::fs::File> {
+    let dir = log_dir()?;
+    std::fs::create_dir_all(&dir).ok()?;
+    let today = chrono::Local::now().format("%Y-%m-%d");
+    let path = dir.join(format!("mcp-server.{today}.jsonl"));
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .ok()
+}
+
 fn main() -> ExitCode {
-    // Logging goes to stderr — stdout is the JSON-RPC channel.  Using an
-    // env filter lets users crank up verbosity via RUST_LOG when a host
-    // integration misbehaves, without making the default output noisy.
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("warn,devlogger=info,devlogger_mcp=info"));
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
+
+    // Stderr layer — human-readable, always active.
+    let stderr_layer = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stderr)
-        .with_ansi(false)
-        .init();
+        .with_ansi(false);
+
+    // File layer — structured JSONL, best-effort.  Uses synchronous
+    // Mutex<File> writes — fine for this low-volume server and
+    // guarantees every log line is flushed to disk immediately.
+    let file_layer = open_log_file().map(|file| {
+        tracing_subscriber::fmt::layer()
+            .json()
+            .with_writer(Mutex::new(file))
+    });
+
+    let subscriber = tracing_subscriber::registry()
+        .with(filter)
+        .with(stderr_layer)
+        .with(file_layer);
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("failed to set tracing subscriber");
 
     let args = Args::parse();
 
