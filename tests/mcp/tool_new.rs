@@ -3,7 +3,7 @@
 use super::common::*;
 
 #[tokio::test]
-async fn new_entry_creates_file_and_returns_canonical_line() {
+async fn new_entry_creates_file_and_returns_success_message() {
     let (server, dir) = fresh_server();
     let result = server
         .devlog_new(new_args("parser", "first entry"))
@@ -13,10 +13,18 @@ async fn new_entry_creates_file_and_returns_canonical_line() {
 
     let text = text_of(&result);
     assert!(
-        text.starts_with("- 1 | "),
-        "expected canonical entry line, got {text:?}"
+        text.contains("#1") && text.contains("successfully created"),
+        "expected success message referencing entry #1, got {text:?}"
     );
-    assert!(text.ends_with(": first entry"), "got {text:?}");
+    // The raw entry line must NOT leak into the response.
+    assert!(
+        !text.starts_with("- 1 | "),
+        "response should not include the canonical entry line, got {text:?}"
+    );
+    assert!(
+        !text.contains(": first entry"),
+        "response should not include the entry text, got {text:?}"
+    );
 
     assert!(
         section_file(dir.path(), "parser").is_file(),
@@ -25,7 +33,7 @@ async fn new_entry_creates_file_and_returns_canonical_line() {
 }
 
 #[tokio::test]
-async fn new_entry_structured_content_has_expected_fields() {
+async fn new_entry_structured_content_has_number_date_and_message_only() {
     let (server, _dir) = fresh_server();
     let result = server
         .devlog_new(new_args("core", "hello world"))
@@ -35,14 +43,21 @@ async fn new_entry_structured_content_has_expected_fields() {
 
     let s = structured(&result);
     assert_eq!(s.get("number").and_then(|v| v.as_u64()), Some(1));
-    assert_eq!(s.get("text").and_then(|v| v.as_str()), Some("hello world"));
 
     let date = s.get("date").and_then(|v| v.as_str()).unwrap();
     assert_eq!(date.len(), "YYYY-MM-DD HH:MM:SS".len(), "date was {date:?}");
 
-    let line = s.get("line").and_then(|v| v.as_str()).unwrap();
-    assert!(line.ends_with(": hello world"));
-    assert!(line.starts_with("- 1 | "));
+    let message = s.get("message").and_then(|v| v.as_str()).unwrap();
+    assert!(message.contains("#1"));
+    assert!(message.contains("successfully created"));
+    assert!(message.contains(date));
+
+    // Only `number`, `date`, and `message` should be present — no leak of
+    // the entry's text or its canonical line.
+    let obj = s.as_object().expect("structured result is an object");
+    let mut keys: Vec<&str> = obj.keys().map(String::as_str).collect();
+    keys.sort();
+    assert_eq!(keys, vec!["date", "message", "number"]);
 }
 
 #[tokio::test]

@@ -3,7 +3,12 @@
 //! `notifications/initialized` message" that have shown up in other
 //! stdio MCP servers.
 
+use std::process::Stdio;
 use std::time::Duration;
+
+use serde_json::json;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::time::timeout;
 
 use super::e2e_common::*;
 
@@ -77,6 +82,114 @@ async fn session_survives_sustained_tool_call_volume() {
     assert_eq!(structured(&listed).as_array().unwrap().len(), 50);
 
     client.cancel().await.ok();
+}
+
+#[tokio::test]
+async fn server_handles_rapid_sequential_calls_without_stalling() {
+    // Fire tool calls as fast as the client can — each one should
+    // complete within the per-call budget.  This catches any
+    // per-request serialization bug in the server where one response's
+    // timing bleeds into the next.
+    let base = fresh_base();
+    let client = spawn_subprocess_client(base.path()).await;
+
+    for i in 0..20 {
+        let result = tokio::time::timeout(
+            Duration::from_secs(3),
+            call_new(&client, "rapid", &format!("rapid-{i}")),
+        )
+        .await
+        .expect("rapid call should not stall");
+        assert_wire_ok(&result);
+    }
+
+    // Confirm all entries persisted correctly.
+    let listed = call_list(&client, Some("rapid")).await;
+    assert_eq!(structured(&listed).as_array().unwrap().len(), 20);
+    client.cancel().await.ok();
+}
+
+#[tokio::test]
+async fn server_survives_error_call_followed_by_valid_call() {
+    // After the RCA incident: server returns a tool error (oversized
+    // entry), and the next call must still succeed — the server must
+    // not enter a bad state after returning an error.
+    let base = fresh_base();
+    let client = spawn_subprocess_client(base.path()).await;
+
+    // First: a call that fails (control char).
+    assert_wire_err(&call_new(&client, "core", "\u{0007}bell").await);
+    // Second: a valid call must succeed.
+    assert_wire_ok(&call_new(&client, "core", "recovery").await);
+    // Third: another error (oversized).
+    let oversized: String = "z".repeat(devlogger::entry::MAX_ENTRY_COLS + 1);
+    assert_wire_err(&call_new(&client, "core", &oversized).await);
+    // Fourth: valid again.
+    assert_wire_ok(&call_new(&client, "core", "still alive").await);
+
+    let listed = call_list(&client, Some("core")).await;
+    assert_eq!(structured(&listed).as_array().unwrap().len(), 2);
+    client.cancel().await.ok();
+}
+
+#[tokio::test]
+async fn stdin_close_after_tool_call_exits_cleanly() {
+    // Raw-stdio test: send a tool call then immediately close stdin.
+    // The server must exit without hanging or panicking.  This guards
+    // against the "response written to a broken pipe" failure mode.
+    let dir = tempfile::tempdir().unwrap();
+    let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_devlogger-mcp"))
+        .arg("--dir")
+        .arg(dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+
+    let mut stdin = child.stdin.take().unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let mut reader = BufReader::new(stdout);
+
+    // Initialize.
+    let init = json!({
+        "jsonrpc": "2.0", "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": { "name": "lifecycle-test", "version": "0" }
+        }
+    });
+    stdin.write_all(format!("{init}\n").as_bytes()).await.unwrap();
+    let mut line = String::new();
+    timeout(Duration::from_secs(10), reader.read_line(&mut line))
+        .await
+        .expect("init response")
+        .unwrap();
+
+    // Send notifications/initialized.
+    let notif = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
+    stdin.write_all(format!("{notif}\n").as_bytes()).await.unwrap();
+
+    // Send a tool call, then close stdin before reading the response.
+    let call = json!({
+        "jsonrpc": "2.0", "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": "devlog_new",
+            "arguments": { "section": "mid", "text": "in-flight" }
+        }
+    });
+    stdin.write_all(format!("{call}\n").as_bytes()).await.unwrap();
+    stdin.shutdown().await.ok();
+    drop(stdin);
+
+    // Server must exit within budget — not hang.
+    let status = timeout(Duration::from_secs(15), child.wait())
+        .await
+        .expect("server should exit within 15s after stdin close");
+    let _ = status;
 }
 
 #[tokio::test]

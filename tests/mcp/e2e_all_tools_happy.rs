@@ -8,7 +8,7 @@ use serde_json::json;
 use super::e2e_common::*;
 
 #[tokio::test]
-async fn devlog_new_over_wire_writes_and_returns_entry() {
+async fn devlog_new_over_wire_writes_and_returns_confirmation() {
     let base = fresh_base();
     let client = spawn_subprocess_client(base.path()).await;
 
@@ -17,11 +17,20 @@ async fn devlog_new_over_wire_writes_and_returns_entry() {
 
     let s = structured(&result);
     assert_eq!(s.get("number").and_then(|v| v.as_u64()), Some(1));
-    assert_eq!(s.get("text").and_then(|v| v.as_str()), Some("first"));
+    let date = s.get("date").and_then(|v| v.as_str()).expect("date field");
+    assert_eq!(date.len(), "YYYY-MM-DD HH:MM:SS".len());
+    let message = s
+        .get("message")
+        .and_then(|v| v.as_str())
+        .expect("message field");
+    assert!(message.contains("#1"));
+    assert!(message.contains("successfully created"));
 
-    let line = text_content(&result);
-    assert!(line.starts_with("- 1 | "));
-    assert!(line.ends_with(": first"));
+    let body = text_content(&result);
+    assert_eq!(body, message);
+    // The raw entry line must NOT leak into the wire response.
+    assert!(!body.starts_with("- 1 | "), "got {body:?}");
+    assert!(!body.contains(": first"), "got {body:?}");
 
     assert!(section_file(base.path(), "wire").is_file());
     client.cancel().await.ok();

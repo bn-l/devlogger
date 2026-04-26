@@ -156,6 +156,48 @@ async fn move_invalid_dest_section_is_tool_error_over_wire() {
 }
 
 #[tokio::test]
+async fn new_with_oversized_text_is_tool_error_over_wire() {
+    // The incident that prompted this test: a 560-column entry was
+    // correctly rejected by `validate_entry_text`, but Claude Code
+    // failed to deliver the response and tore down the transport.
+    // This asserts the *server* behaviour is correct: reject fast,
+    // return a tool-level error (not protocol error), include the
+    // diagnostic message.
+    let base = fresh_base();
+    let client = spawn_subprocess_client(base.path()).await;
+
+    let oversized: String = "x".repeat(devlogger::entry::MAX_ENTRY_COLS + 60);
+    let result = call_new(&client, "core", &oversized).await;
+    let msg = assert_wire_err(&result);
+    assert!(
+        msg.contains("entry too long"),
+        "expected 'entry too long' diagnostic, got: {msg}"
+    );
+
+    // The server must still be alive after the rejection — a second
+    // call with valid input must succeed.
+    assert_wire_ok(&call_new(&client, "core", "follow-up").await);
+
+    client.cancel().await.ok();
+}
+
+#[tokio::test]
+async fn update_with_oversized_text_is_tool_error_over_wire() {
+    let base = fresh_base();
+    let client = spawn_subprocess_client(base.path()).await;
+
+    assert_wire_ok(&call_new(&client, "core", "original").await);
+
+    let oversized: String = "x".repeat(devlogger::entry::MAX_ENTRY_COLS + 1);
+    let msg = assert_wire_err(&call_update(&client, "core", "1", &oversized).await);
+    assert!(
+        msg.contains("entry too long"),
+        "expected 'entry too long' diagnostic, got: {msg}"
+    );
+    client.cancel().await.ok();
+}
+
+#[tokio::test]
 async fn missing_required_argument_surfaces_as_protocol_error() {
     // Omitting `text` on `devlog_new` means the JSON payload cannot
     // deserialize into NewArgs — rmcp should reject this at the protocol

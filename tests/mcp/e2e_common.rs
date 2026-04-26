@@ -50,6 +50,24 @@ pub async fn spawn_subprocess_client(
         .expect("initialize handshake failed")
 }
 
+/// Same as [`spawn_subprocess_client`] but with additional env vars set
+/// on the child process.
+pub async fn spawn_subprocess_client_with_env(
+    base: &Path,
+    env: &[(&str, &str)],
+) -> RunningService<RoleClient, ClientInfo> {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_devlogger-mcp"));
+    cmd.arg("--dir").arg(base);
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    let transport = TokioChildProcess::new(cmd).expect("spawn devlogger-mcp");
+    client_info()
+        .serve(transport)
+        .await
+        .expect("initialize handshake failed")
+}
+
 /// Spin up a `DevlogServer` inside the current process using a duplex
 /// pipe transport (rmcp's idiomatic in-test pattern).  Skips the fork
 /// cost but still exercises the full rmcp protocol layer: initialize

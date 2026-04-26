@@ -95,7 +95,7 @@ async fn tool_errors_flip_is_error_and_still_carry_content() {
 }
 
 #[tokio::test]
-async fn update_result_shape_matches_new_result_shape() {
+async fn update_result_carries_full_entry_fields() {
     let (server, _dir) = fresh_server();
     server.devlog_new(new_args("core", "orig")).await.unwrap();
     let result = server

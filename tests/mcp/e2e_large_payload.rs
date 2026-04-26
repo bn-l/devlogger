@@ -76,8 +76,8 @@ async fn single_max_length_entry_text_round_trips_intact() {
     .await;
     assert_wire_ok(&created);
     assert_eq!(
-        structured(&created).get("text").and_then(|v| v.as_str()),
-        Some(big.as_str())
+        structured(&created).get("number").and_then(|v| v.as_u64()),
+        Some(1)
     );
 
     // Read-back via devlog_read must yield the exact text inside the entry line.
@@ -105,8 +105,8 @@ async fn multibyte_unicode_text_round_trips_intact() {
     let created = call_new(&client, "uni", text).await;
     assert_wire_ok(&created);
     assert_eq!(
-        structured(&created).get("text").and_then(|v| v.as_str()),
-        Some(text)
+        structured(&created).get("number").and_then(|v| v.as_u64()),
+        Some(1)
     );
 
     let listed = call_list(&client, Some("uni")).await;
