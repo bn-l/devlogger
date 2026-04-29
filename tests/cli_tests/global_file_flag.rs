@@ -25,15 +25,8 @@ fn short_flag_after_subcommand() {
 
 #[test]
 fn short_flag_after_subcommand_with_positional() {
-    let cli = Cli::try_parse_from([
-        "devlogger",
-        "new",
-        "backend",
-        "my entry",
-        "-f",
-        "/tmp/proj",
-    ])
-    .unwrap();
+    let cli = Cli::try_parse_from(["devlogger", "new", "backend", "my entry", "-f", "/tmp/proj"])
+        .unwrap();
     assert_eq!(cli.file, Some(PathBuf::from("/tmp/proj")));
     match cli.command {
         Command::New { args } => assert_eq!(args, vec!["backend", "my entry"]),

@@ -161,7 +161,10 @@ async fn stdin_close_after_tool_call_exits_cleanly() {
             "clientInfo": { "name": "lifecycle-test", "version": "0" }
         }
     });
-    stdin.write_all(format!("{init}\n").as_bytes()).await.unwrap();
+    stdin
+        .write_all(format!("{init}\n").as_bytes())
+        .await
+        .unwrap();
     let mut line = String::new();
     timeout(Duration::from_secs(10), reader.read_line(&mut line))
         .await
@@ -170,7 +173,10 @@ async fn stdin_close_after_tool_call_exits_cleanly() {
 
     // Send notifications/initialized.
     let notif = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
-    stdin.write_all(format!("{notif}\n").as_bytes()).await.unwrap();
+    stdin
+        .write_all(format!("{notif}\n").as_bytes())
+        .await
+        .unwrap();
 
     // Send a tool call, then close stdin before reading the response.
     let call = json!({
@@ -181,7 +187,10 @@ async fn stdin_close_after_tool_call_exits_cleanly() {
             "arguments": { "section": "mid", "text": "in-flight" }
         }
     });
-    stdin.write_all(format!("{call}\n").as_bytes()).await.unwrap();
+    stdin
+        .write_all(format!("{call}\n").as_bytes())
+        .await
+        .unwrap();
     stdin.shutdown().await.ok();
     drop(stdin);
 

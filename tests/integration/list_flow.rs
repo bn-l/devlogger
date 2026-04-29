@@ -80,7 +80,10 @@ fn list_all_rows_fit_in_80_columns_including_prefix() {
         "line width is {} cols, expected <= 80: {line}",
         line.width()
     );
-    assert!(line.starts_with("[backend] "), "prefix must be intact: {line}");
+    assert!(
+        line.starts_with("[backend] "),
+        "prefix must be intact: {line}"
+    );
     assert!(line.ends_with(" more)"), "got: {line}");
 }
 

@@ -10,17 +10,17 @@ async fn read_entire_file_returns_full_contents() {
 
     let disk = std::fs::read_to_string(section_file(dir.path(), "core")).unwrap();
 
-    let result = server
-        .devlog_read(read_args("core", None))
-        .await
-        .unwrap();
+    let result = server.devlog_read(read_args("core", None)).await.unwrap();
     assert_ok(&result);
 
     let text = text_of(&result);
     assert_eq!(text, disk, "read output must be byte-equal to the file");
 
     let s = structured(&result);
-    assert_eq!(s.get("contents").and_then(|v| v.as_str()), Some(disk.as_str()));
+    assert_eq!(
+        s.get("contents").and_then(|v| v.as_str()),
+        Some(disk.as_str())
+    );
 }
 
 #[tokio::test]
@@ -71,10 +71,7 @@ async fn read_n_larger_than_total_returns_all_entries() {
 #[tokio::test]
 async fn read_missing_section_is_tool_error() {
     let (server, _dir) = fresh_server();
-    let result = server
-        .devlog_read(read_args("ghost", None))
-        .await
-        .unwrap();
+    let result = server.devlog_read(read_args("ghost", None)).await.unwrap();
     let msg = assert_err(&result);
     assert!(msg.contains("not found"), "got {msg}");
 }

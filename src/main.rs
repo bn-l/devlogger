@@ -106,9 +106,9 @@ fn split_read_args(args: Vec<String>) -> Result<(String, Option<usize>)> {
     match it.next() {
         None => Ok((section, None)),
         Some(b) => {
-            let n: usize = b.parse().map_err(|_| {
-                eyre::eyre!("`<n>` must be a non-negative integer, got `{b}`")
-            })?;
+            let n: usize = b
+                .parse()
+                .map_err(|_| eyre::eyre!("`<n>` must be a non-negative integer, got `{b}`"))?;
             Ok((section, Some(n)))
         }
     }

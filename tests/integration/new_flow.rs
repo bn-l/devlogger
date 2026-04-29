@@ -19,7 +19,10 @@ fn first_new_creates_devlog_directory_and_file() {
 fn first_entry_numbered_one() {
     let dir = tempfile::tempdir().unwrap();
     let stdout = run_ok(dir.path(), &["new", "main", "hello"]);
-    assert!(stdout.starts_with("- 1 | "), "first entry should be #1: {stdout}");
+    assert!(
+        stdout.starts_with("- 1 | "),
+        "first entry should be #1: {stdout}"
+    );
     assert!(stdout.trim_end().ends_with(": hello"));
 }
 
@@ -83,10 +86,8 @@ fn section_numbering_is_independent() {
     run_ok(dir.path(), &["new", "backend", "back one"]);
 
     // main has 2 entries starting at 1; backend has 1 entry starting at 1.
-    let main_contents =
-        std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
-    let back_contents =
-        std::fs::read_to_string(section_devlog(dir.path(), "backend")).unwrap();
+    let main_contents = std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
+    let back_contents = std::fs::read_to_string(section_devlog(dir.path(), "backend")).unwrap();
     assert!(main_contents.contains("- 1 | "));
     assert!(main_contents.contains("- 2 | "));
     assert!(back_contents.contains("- 1 | "));
@@ -103,7 +104,11 @@ fn new_without_dash_f_uses_cwd() {
         .args(["new", "main", "cwd entry"])
         .output()
         .unwrap();
-    assert!(output.status.success(), "stderr: {:?}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {:?}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert!(section_devlog(dir.path(), "main").exists());
 }
 

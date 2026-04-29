@@ -24,8 +24,10 @@ fn whitespace_only_entry_text_is_accepted_and_preserved() {
     let dir = tempfile::tempdir().unwrap();
     run_ok(dir.path(), &["new", "main", "   "]);
     let contents = std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
-    assert!(contents.contains(":    \n") || contents.contains(":    \r\n"),
-        "got: {contents:?}");
+    assert!(
+        contents.contains(":    \n") || contents.contains(":    \r\n"),
+        "got: {contents:?}"
+    );
 }
 
 #[test]
@@ -49,14 +51,18 @@ fn no_trailing_newline_preserved_on_update() {
     run_ok(dir.path(), &["update", "main", "1", "one-updated"]);
 
     let bytes = std::fs::read(&path).unwrap();
-    assert!(!bytes.ends_with(b"\n"), "no-trailing-newline should be preserved: {bytes:?}");
+    assert!(
+        !bytes.ends_with(b"\n"),
+        "no-trailing-newline should be preserved: {bytes:?}"
+    );
 }
 
 #[test]
 fn read_whole_file_dumps_bytes_verbatim_including_prose() {
     let dir = tempfile::tempdir().unwrap();
     let path = section_devlog(dir.path(), "main");
-    let bytes = b"# Project devlog\n\nSome prose about the project.\n- 1 | 2026-04-14 10:00:00: first\n";
+    let bytes =
+        b"# Project devlog\n\nSome prose about the project.\n- 1 | 2026-04-14 10:00:00: first\n";
     seed(&path, bytes);
 
     let out = run_ok(dir.path(), &["read", "main"]);
@@ -120,7 +126,11 @@ fn f_flag_accepts_relative_path() {
         .args(["-f", &rel_name, "new", "main", "rel-path-entry"])
         .output()
         .unwrap();
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert!(section_devlog(dir.path(), "main").exists());
 }
 
@@ -171,5 +181,8 @@ fn update_errors_when_no_entries_exist_even_if_file_present() {
     seed(&path, b"# just a header\n");
 
     let stderr = run_err(dir.path(), &["update", "main", "1", "x"]);
-    assert!(stderr.contains("no entry with number 1"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("no entry with number 1"),
+        "stderr: {stderr}"
+    );
 }

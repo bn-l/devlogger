@@ -10,8 +10,7 @@ fn run_captured(args: &[&str]) -> (i32, String) {
         .expect("spawn");
     (
         out.status.code().unwrap_or(-1),
-        String::from_utf8_lossy(&out.stdout).into_owned()
-            + &String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr),
     )
 }
 
@@ -20,7 +19,10 @@ fn help_exits_zero_and_lists_all_subcommands() {
     let (code, text) = run_captured(&["--help"]);
     assert_eq!(code, 0, "text: {text}");
     for word in ["new", "list", "update", "read", "sections"] {
-        assert!(text.contains(word), "help missing subcommand `{word}`: {text}");
+        assert!(
+            text.contains(word),
+            "help missing subcommand `{word}`: {text}"
+        );
     }
     assert!(text.contains("--file") || text.contains("-f"));
 }

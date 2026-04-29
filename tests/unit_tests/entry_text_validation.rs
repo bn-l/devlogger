@@ -92,8 +92,14 @@ fn rejects_text_one_column_over_limit() {
     let s = "a".repeat(MAX_ENTRY_COLS + 1);
     let err = validate_entry_text(&s).unwrap_err().to_string();
     assert!(err.contains("too long"), "unexpected: {err}");
-    assert!(err.contains(&MAX_ENTRY_COLS.to_string()), "should mention limit: {err}");
-    assert!(err.contains("concise"), "should tell the user what to do: {err}");
+    assert!(
+        err.contains(&MAX_ENTRY_COLS.to_string()),
+        "should mention limit: {err}"
+    );
+    assert!(
+        err.contains("concise"),
+        "should tell the user what to do: {err}"
+    );
 }
 
 #[test]

@@ -221,9 +221,11 @@ fn parse_entry_line(path: &Path, line_no: usize, rest: &str) -> Result<Entry, Pa
         .ok_or_else(|| make_err("missing ` | ` separator between number and date".into()))?;
 
     let num_str = num_str.trim();
-    let number: u32 = num_str
-        .parse()
-        .map_err(|_| make_err(format!("entry number `{num_str}` is not a positive integer")))?;
+    let number: u32 = num_str.parse().map_err(|_| {
+        make_err(format!(
+            "entry number `{num_str}` is not a positive integer"
+        ))
+    })?;
 
     let (date_str, text) = after_num
         .split_once(": ")

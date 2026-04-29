@@ -6,15 +6,18 @@ use super::common::*;
 /// timestamps are guaranteed distinct.  Going through the CLI would
 /// stamp `Local::now()` for both, which collides at second resolution
 /// when the test runs fast — making date-based lookups flaky.
-async fn seeded_server() -> (devlogger::mcp::DevlogServer, tempfile::TempDir, String, String) {
+async fn seeded_server() -> (
+    devlogger::mcp::DevlogServer,
+    tempfile::TempDir,
+    String,
+    String,
+) {
     let (server, dir) = fresh_server();
     let path = section_file(dir.path(), "core");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let d1 = "2026-04-14 09:00:00".to_string();
     let d2 = "2026-04-15 18:30:45".to_string();
-    let contents = format!(
-        "- 1 | {d1}: initial one\n- 2 | {d2}: initial two\n"
-    );
+    let contents = format!("- 1 | {d1}: initial one\n- 2 | {d2}: initial two\n");
     std::fs::write(&path, contents).unwrap();
     (server, dir, d1, d2)
 }
@@ -124,7 +127,10 @@ async fn update_rejects_multiline_replacement() {
         .await
         .unwrap();
     let msg = assert_err(&result);
-    assert!(msg.contains("newline") || msg.contains("control"), "got {msg}");
+    assert!(
+        msg.contains("newline") || msg.contains("control"),
+        "got {msg}"
+    );
 }
 
 #[tokio::test]

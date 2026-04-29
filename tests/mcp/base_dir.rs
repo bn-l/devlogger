@@ -56,7 +56,10 @@ async fn list_reads_from_override_base_dir() {
 
     // …but the default-scoped list call does not.
     let result2 = server.devlog_list(list_args(Some("core"))).await.unwrap();
-    assert!(is_error(&result2), "default base should not see the section");
+    assert!(
+        is_error(&result2),
+        "default base should not see the section"
+    );
 }
 
 #[tokio::test]
@@ -92,8 +95,8 @@ async fn sections_honours_override_base_dir() {
 
 #[tokio::test]
 async fn empty_string_base_dir_falls_back_to_default() {
-    use rmcp::handler::server::wrapper::Parameters;
     use devlogger::mcp::args::NewArgs;
+    use rmcp::handler::server::wrapper::Parameters;
 
     let (server, dir) = fresh_server();
     let params = Parameters(NewArgs {

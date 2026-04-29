@@ -50,7 +50,10 @@ fn file_ends_with_newline() {
     let dir = tempfile::tempdir().unwrap();
     run_ok(dir.path(), &["new", "main", "x"]);
     let contents = std::fs::read_to_string(section_devlog(dir.path(), "main")).unwrap();
-    assert!(contents.ends_with('\n'), "file should end with newline: {contents:?}");
+    assert!(
+        contents.ends_with('\n'),
+        "file should end with newline: {contents:?}"
+    );
 }
 
 #[test]

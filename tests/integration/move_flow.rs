@@ -24,22 +24,18 @@ fn entry_lines(path: &std::path::Path) -> Vec<String> {
 #[test]
 fn move_appends_newer_entry_to_end_of_dest() {
     let dir = tempfile::tempdir().unwrap();
-    seed(
-        dir.path(),
-        "from",
-        &[("2026-04-15 09:00:00", "moving me")],
-    );
+    seed(dir.path(), "from", &[("2026-04-15 09:00:00", "moving me")]);
     seed(
         dir.path(),
         "to",
-        &[
-            ("2026-04-10 09:00:00", "a"),
-            ("2026-04-12 09:00:00", "b"),
-        ],
+        &[("2026-04-10 09:00:00", "a"), ("2026-04-12 09:00:00", "b")],
     );
 
     let out = run_ok(dir.path(), &["move", "from", "1", "to"]);
-    assert!(out.starts_with("- 3 | "), "expected new number 3 in dest, got {out}");
+    assert!(
+        out.starts_with("- 3 | "),
+        "expected new number 3 in dest, got {out}"
+    );
 
     let dst = entry_lines(&section_devlog(dir.path(), "to"));
     assert_eq!(dst.len(), 3);
@@ -52,11 +48,7 @@ fn move_appends_newer_entry_to_end_of_dest() {
 #[test]
 fn move_slots_entry_in_middle_by_date() {
     let dir = tempfile::tempdir().unwrap();
-    seed(
-        dir.path(),
-        "from",
-        &[("2026-04-13 09:00:00", "mid")],
-    );
+    seed(dir.path(), "from", &[("2026-04-13 09:00:00", "mid")]);
     seed(
         dir.path(),
         "to",
@@ -106,11 +98,7 @@ fn move_renumbers_source_after_removal() {
 #[test]
 fn move_to_new_section_creates_it() {
     let dir = tempfile::tempdir().unwrap();
-    seed(
-        dir.path(),
-        "from",
-        &[("2026-04-10 09:00:00", "lone")],
-    );
+    seed(dir.path(), "from", &[("2026-04-10 09:00:00", "lone")]);
 
     run_ok(dir.path(), &["move", "from", "1", "fresh"]);
 
@@ -146,11 +134,7 @@ fn move_by_exact_date_resolves_target() {
 #[test]
 fn move_same_section_errors() {
     let dir = tempfile::tempdir().unwrap();
-    seed(
-        dir.path(),
-        "core",
-        &[("2026-04-14 09:00:00", "x")],
-    );
+    seed(dir.path(), "core", &[("2026-04-14 09:00:00", "x")]);
 
     let stderr = run_err(dir.path(), &["move", "core", "1", "core"]);
     assert!(stderr.contains("same section"), "stderr: {stderr}");
@@ -166,11 +150,7 @@ fn move_missing_source_errors() {
 #[test]
 fn move_unknown_id_errors() {
     let dir = tempfile::tempdir().unwrap();
-    seed(
-        dir.path(),
-        "from",
-        &[("2026-04-14 09:00:00", "only")],
-    );
+    seed(dir.path(), "from", &[("2026-04-14 09:00:00", "only")]);
     let stderr = run_err(dir.path(), &["move", "from", "99", "to"]);
     assert!(stderr.contains("no entry"), "stderr: {stderr}");
 }
@@ -178,11 +158,7 @@ fn move_unknown_id_errors() {
 #[test]
 fn move_rejects_invalid_dest_section() {
     let dir = tempfile::tempdir().unwrap();
-    seed(
-        dir.path(),
-        "from",
-        &[("2026-04-14 09:00:00", "x")],
-    );
+    seed(dir.path(), "from", &[("2026-04-14 09:00:00", "x")]);
     let (code, _, stderr) = run(dir.path(), &["move", "from", "1", "Bad"]);
     assert_ne!(code, 0);
     assert!(stderr.contains("invalid section"), "stderr: {stderr}");

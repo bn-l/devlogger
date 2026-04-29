@@ -46,7 +46,10 @@ fn update_preserves_entry_number_and_date() {
     let list_out = run_ok(dir.path(), &["list", "main"]);
     let line = list_out.lines().next().unwrap();
     assert!(line.starts_with("- 1 | "), "number preserved: {line}");
-    assert!(line.contains(&orig_date), "date preserved: got {line}, orig_date={orig_date}");
+    assert!(
+        line.contains(&orig_date),
+        "date preserved: got {line}, orig_date={orig_date}"
+    );
 }
 
 #[test]
@@ -77,7 +80,10 @@ fn update_nonexistent_number_errors() {
     let dir = tempfile::tempdir().unwrap();
     run_ok(dir.path(), &["new", "main", "only one"]);
     let stderr = run_err(dir.path(), &["update", "main", "99", "nope"]);
-    assert!(stderr.contains("no entry with number 99"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("no entry with number 99"),
+        "stderr: {stderr}"
+    );
 }
 
 #[test]
@@ -91,7 +97,10 @@ fn update_missing_file_errors() {
 fn update_invalid_id_errors() {
     let dir = tempfile::tempdir().unwrap();
     run_ok(dir.path(), &["new", "main", "hi"]);
-    let stderr = run_err(dir.path(), &["update", "main", "not-a-number-or-date", "nope"]);
+    let stderr = run_err(
+        dir.path(),
+        &["update", "main", "not-a-number-or-date", "nope"],
+    );
     assert!(stderr.contains("no entry matches id"), "stderr: {stderr}");
 }
 

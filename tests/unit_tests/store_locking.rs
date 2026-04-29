@@ -30,7 +30,10 @@ fn acquire_lock_creates_lockfile_and_parent_dir() {
 
     let _guard = acquire_lock_for(&section).unwrap();
 
-    assert!(section.parent().unwrap().is_dir(), "parent dir should be created");
+    assert!(
+        section.parent().unwrap().is_dir(),
+        "parent dir should be created"
+    );
     assert!(
         lock_path_for(&section).unwrap().is_file(),
         "lockfile should be created"
@@ -54,7 +57,10 @@ fn second_acquire_blocks_until_first_released() {
 
     // Give the thread time to try; confirm it hasn't finished.
     thread::sleep(Duration::from_millis(150));
-    assert!(!handle.is_finished(), "second acquire should still be blocked");
+    assert!(
+        !handle.is_finished(),
+        "second acquire should still be blocked"
+    );
 
     drop(first);
 

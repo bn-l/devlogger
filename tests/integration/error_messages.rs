@@ -5,7 +5,10 @@ fn numeric_section_name_error_mentions_the_bad_char() {
     let dir = tempfile::tempdir().unwrap();
     let (code, _, stderr) = run(dir.path(), &["new", "5", "nope"]);
     assert_ne!(code, 0);
-    assert!(stderr.contains("invalid section name '5'"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("invalid section name '5'"),
+        "stderr: {stderr}"
+    );
     assert!(stderr.contains("illegal character '5'"), "stderr: {stderr}");
 }
 
@@ -59,9 +62,18 @@ fn parse_error_is_single_line_with_path_and_line_number() {
 
     let (code, _, stderr) = run(dir.path(), &["list", "main"]);
     assert_ne!(code, 0);
-    assert!(stderr.contains(&path.display().to_string()), "stderr: {stderr}");
-    assert!(stderr.contains(":3:") || stderr.contains(":2:"), "should include line number: {stderr}");
-    assert!(stderr.contains("expected `- <number> | "), "should describe the format: {stderr}");
+    assert!(
+        stderr.contains(&path.display().to_string()),
+        "stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains(":3:") || stderr.contains(":2:"),
+        "should include line number: {stderr}"
+    );
+    assert!(
+        stderr.contains("expected `- <number> | "),
+        "should describe the format: {stderr}"
+    );
 }
 
 #[test]
@@ -78,11 +90,23 @@ fn parse_error_does_not_dump_file_contents_via_cli() {
 
     let (code, _, stderr) = run(dir.path(), &["list", "main"]);
     assert_ne!(code, 0);
-    assert!(!stderr.contains("SENTINEL_SECRET_aaa"), "file content leaked: {stderr}");
-    assert!(!stderr.contains("SENTINEL_SECRET_bbb"), "file content leaked: {stderr}");
-    assert!(!stderr.contains("totally broken line"), "raw line leaked: {stderr}");
+    assert!(
+        !stderr.contains("SENTINEL_SECRET_aaa"),
+        "file content leaked: {stderr}"
+    );
+    assert!(
+        !stderr.contains("SENTINEL_SECRET_bbb"),
+        "file content leaked: {stderr}"
+    );
+    assert!(
+        !stderr.contains("totally broken line"),
+        "raw line leaked: {stderr}"
+    );
     // Should be short and single-line (plus the `devlogger: ` prefix + newline).
-    assert!(stderr.lines().count() <= 2, "error should be concise: {stderr}");
+    assert!(
+        stderr.lines().count() <= 2,
+        "error should be concise: {stderr}"
+    );
 }
 
 #[test]

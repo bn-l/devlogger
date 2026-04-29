@@ -12,13 +12,13 @@ async fn list_single_section_returns_entries_in_order() {
             .unwrap();
     }
 
-    let result = server
-        .devlog_list(list_args(Some("parser")))
-        .await
-        .unwrap();
+    let result = server.devlog_list(list_args(Some("parser"))).await.unwrap();
     assert_ok(&result);
 
-    let s = structured(&result).as_array().expect("expected array").clone();
+    let s = structured(&result)
+        .as_array()
+        .expect("expected array")
+        .clone();
     assert_eq!(s.len(), 3);
     for (i, v) in s.iter().enumerate() {
         let n = v.get("number").and_then(|x| x.as_u64()).unwrap();

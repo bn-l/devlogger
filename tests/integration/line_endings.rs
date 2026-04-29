@@ -29,7 +29,11 @@ fn crlf_file_preserved_after_update() {
     run_ok(dir.path(), &["update", "main", "2", "two-updated"]);
 
     let after = std::fs::read(&path).unwrap();
-    assert_eq!(count_crlf(&after), 2, "should have 2 CRLF sequences: {after:?}");
+    assert_eq!(
+        count_crlf(&after),
+        2,
+        "should have 2 CRLF sequences: {after:?}"
+    );
     assert_eq!(count_bare_lf(&after), 0, "no bare LFs allowed: {after:?}");
     assert!(String::from_utf8(after).unwrap().contains(": two-updated"));
 }
@@ -59,7 +63,11 @@ fn crlf_preserved_across_prose_in_update() {
     run_ok(dir.path(), &["update", "main", "1", "ONE"]);
 
     let after = std::fs::read(&path).unwrap();
-    assert_eq!(count_bare_lf(&after), 0, "should remain pure CRLF: {after:?}");
+    assert_eq!(
+        count_bare_lf(&after),
+        0,
+        "should remain pure CRLF: {after:?}"
+    );
     let s = String::from_utf8(after).unwrap();
     assert!(s.contains("# Header"));
     assert!(s.contains("Some prose."));

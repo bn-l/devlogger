@@ -49,16 +49,25 @@ async fn move_entry_appends_to_dest_when_newer_than_all_existing() {
         ],
     );
 
-    let result = server.devlog_move(move_args("from", "1", "to")).await.unwrap();
+    let result = server
+        .devlog_move(move_args("from", "1", "to"))
+        .await
+        .unwrap();
     assert_ok(&result);
 
     let s = structured(&result);
-    assert_eq!(s.get("number").and_then(|v| v.as_u64()), Some(3), "should be #3 in dest");
+    assert_eq!(
+        s.get("number").and_then(|v| v.as_u64()),
+        Some(3),
+        "should be #3 in dest"
+    );
     assert_eq!(s.get("text").and_then(|v| v.as_str()), Some("moving me"));
 
     let to_contents = std::fs::read_to_string(section_file(dir.path(), "to")).unwrap();
-    let entry_lines: Vec<&str> =
-        to_contents.lines().filter(|l| l.starts_with("- ")).collect();
+    let entry_lines: Vec<&str> = to_contents
+        .lines()
+        .filter(|l| l.starts_with("- "))
+        .collect();
     assert_eq!(entry_lines.len(), 3);
     assert!(entry_lines[0].starts_with("- 1 | 2026-04-10"));
     assert!(entry_lines[1].starts_with("- 2 | 2026-04-12"));
@@ -81,7 +90,10 @@ async fn move_entry_inserts_in_middle_renumbering_trailing_entries() {
         ],
     );
 
-    let result = server.devlog_move(move_args("from", "1", "to")).await.unwrap();
+    let result = server
+        .devlog_move(move_args("from", "1", "to"))
+        .await
+        .unwrap();
     assert_ok(&result);
     assert_eq!(
         structured(&result).get("number").and_then(|v| v.as_u64()),
@@ -90,8 +102,10 @@ async fn move_entry_inserts_in_middle_renumbering_trailing_entries() {
     );
 
     let to_contents = std::fs::read_to_string(section_file(dir.path(), "to")).unwrap();
-    let entry_lines: Vec<&str> =
-        to_contents.lines().filter(|l| l.starts_with("- ")).collect();
+    let entry_lines: Vec<&str> = to_contents
+        .lines()
+        .filter(|l| l.starts_with("- "))
+        .collect();
     assert_eq!(entry_lines.len(), 4);
     assert!(entry_lines[0].starts_with("- 1 | 2026-04-10"));
     assert!(entry_lines[1].starts_with("- 2 | 2026-04-13"));
@@ -114,13 +128,21 @@ async fn move_entry_prepends_to_dest_when_older_than_all_existing() {
         ],
     );
 
-    let result = server.devlog_move(move_args("from", "1", "to")).await.unwrap();
+    let result = server
+        .devlog_move(move_args("from", "1", "to"))
+        .await
+        .unwrap();
     assert_ok(&result);
-    assert_eq!(structured(&result).get("number").and_then(|v| v.as_u64()), Some(1));
+    assert_eq!(
+        structured(&result).get("number").and_then(|v| v.as_u64()),
+        Some(1)
+    );
 
     let to_contents = std::fs::read_to_string(section_file(dir.path(), "to")).unwrap();
-    let entry_lines: Vec<&str> =
-        to_contents.lines().filter(|l| l.starts_with("- ")).collect();
+    let entry_lines: Vec<&str> = to_contents
+        .lines()
+        .filter(|l| l.starts_with("- "))
+        .collect();
     assert_eq!(entry_lines.len(), 3);
     assert!(entry_lines[0].starts_with("- 1 | 2026-04-01"));
     assert!(entry_lines[0].ends_with(": prehistoric"));
@@ -136,13 +158,23 @@ async fn move_entry_to_new_section_creates_it() {
     std::fs::create_dir_all(from_path.parent().unwrap()).unwrap();
     std::fs::write(&from_path, "- 1 | 2026-04-14 09:00:00: lone\n").unwrap();
 
-    let result = server.devlog_move(move_args("from", "1", "fresh")).await.unwrap();
+    let result = server
+        .devlog_move(move_args("from", "1", "fresh"))
+        .await
+        .unwrap();
     assert_ok(&result);
-    assert_eq!(structured(&result).get("number").and_then(|v| v.as_u64()), Some(1));
+    assert_eq!(
+        structured(&result).get("number").and_then(|v| v.as_u64()),
+        Some(1)
+    );
 
     let fresh_contents = std::fs::read_to_string(section_file(dir.path(), "fresh")).unwrap();
     assert!(fresh_contents.contains(": lone"));
-    assert!(fresh_contents.lines().any(|l| l.starts_with("- 1 | 2026-04-14")));
+    assert!(
+        fresh_contents
+            .lines()
+            .any(|l| l.starts_with("- 1 | 2026-04-14"))
+    );
 
     let from_contents = std::fs::read_to_string(from_path).unwrap();
     assert!(
@@ -168,12 +200,17 @@ async fn move_entry_renumbers_source_without_holes() {
     );
 
     // Move the middle entry (2026-04-11, number 2).
-    let result = server.devlog_move(move_args("from", "2", "to")).await.unwrap();
+    let result = server
+        .devlog_move(move_args("from", "2", "to"))
+        .await
+        .unwrap();
     assert_ok(&result);
 
     let from_contents = std::fs::read_to_string(section_file(dir.path(), "from")).unwrap();
-    let entry_lines: Vec<&str> =
-        from_contents.lines().filter(|l| l.starts_with("- ")).collect();
+    let entry_lines: Vec<&str> = from_contents
+        .lines()
+        .filter(|l| l.starts_with("- "))
+        .collect();
     assert_eq!(entry_lines.len(), 3, "one entry moved out");
     assert!(entry_lines[0].starts_with("- 1 | 2026-04-10"));
     assert!(entry_lines[0].ends_with(": src a"));
@@ -237,7 +274,10 @@ async fn move_preserves_prose_in_both_sections() {
     )
     .unwrap();
 
-    let result = server.devlog_move(move_args("from", "2", "to")).await.unwrap();
+    let result = server
+        .devlog_move(move_args("from", "2", "to"))
+        .await
+        .unwrap();
     assert_ok(&result);
 
     let from_contents = std::fs::read_to_string(&from_path).unwrap();
@@ -253,8 +293,10 @@ async fn move_preserves_prose_in_both_sections() {
     assert!(to_contents.contains(": moving out"));
     // Dest now has two entries: "existing" (2026-04-01) first, "moving out"
     // (2026-04-14) second, numbered 1 and 2.
-    let entry_lines: Vec<&str> =
-        to_contents.lines().filter(|l| l.starts_with("- ")).collect();
+    let entry_lines: Vec<&str> = to_contents
+        .lines()
+        .filter(|l| l.starts_with("- "))
+        .collect();
     assert_eq!(entry_lines.len(), 2);
     assert!(entry_lines[0].starts_with("- 1 | 2026-04-01"));
     assert!(entry_lines[1].starts_with("- 2 | 2026-04-14"));
@@ -271,7 +313,10 @@ async fn move_to_same_section_is_tool_error() {
         &[],
     );
 
-    let result = server.devlog_move(move_args("core", "1", "core")).await.unwrap();
+    let result = server
+        .devlog_move(move_args("core", "1", "core"))
+        .await
+        .unwrap();
     let msg = assert_err(&result);
     assert!(msg.contains("same section"), "got {msg}");
 }
@@ -279,7 +324,10 @@ async fn move_to_same_section_is_tool_error() {
 #[tokio::test]
 async fn move_missing_source_section_is_tool_error() {
     let (server, _dir) = fresh_server();
-    let result = server.devlog_move(move_args("nope", "1", "elsewhere")).await.unwrap();
+    let result = server
+        .devlog_move(move_args("nope", "1", "elsewhere"))
+        .await
+        .unwrap();
     let msg = assert_err(&result);
     assert!(msg.contains("not found"), "got {msg}");
 }
@@ -294,7 +342,10 @@ async fn move_unknown_id_is_tool_error() {
         &[("2026-04-14 09:00:00", "only")],
         &[],
     );
-    let result = server.devlog_move(move_args("from", "99", "to")).await.unwrap();
+    let result = server
+        .devlog_move(move_args("from", "99", "to"))
+        .await
+        .unwrap();
     let msg = assert_err(&result);
     assert!(msg.contains("no entry"), "got {msg}");
 }
@@ -309,7 +360,10 @@ async fn move_rejects_invalid_section_name_as_tool_error() {
         &[("2026-04-14 09:00:00", "x")],
         &[],
     );
-    let result = server.devlog_move(move_args("from", "1", "Bad")).await.unwrap();
+    let result = server
+        .devlog_move(move_args("from", "1", "Bad"))
+        .await
+        .unwrap();
     let msg = assert_err(&result);
     assert!(
         msg.contains("invalid section") || msg.contains("illegal"),
@@ -328,7 +382,10 @@ async fn move_preserves_original_date_on_moved_entry() {
         &[],
     );
 
-    let result = server.devlog_move(move_args("from", "1", "to")).await.unwrap();
+    let result = server
+        .devlog_move(move_args("from", "1", "to"))
+        .await
+        .unwrap();
     assert_ok(&result);
     assert_eq!(
         structured(&result).get("date").and_then(|v| v.as_str()),

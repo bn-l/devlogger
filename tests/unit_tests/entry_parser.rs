@@ -15,7 +15,10 @@ fn parses_single_entry() {
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].number, 1);
     assert_eq!(entries[0].text, "hello world");
-    assert_eq!(entries[0].date.format(DATE_FORMAT).to_string(), "2026-04-14 11:02:37");
+    assert_eq!(
+        entries[0].date.format(DATE_FORMAT).to_string(),
+        "2026-04-14 11:02:37"
+    );
 }
 
 #[test]
@@ -103,8 +106,14 @@ fn parse_error_negative_number() {
 fn parse_error_bad_date() {
     let contents = "- 1 | not-a-date: text\n";
     let err = parse_file(p(), contents).unwrap_err().to_string();
-    assert!(err.contains("not-a-date"), "should quote the bad date: {err}");
-    assert!(err.contains("YYYY-MM-DD HH:MM:SS"), "should describe expected format: {err}");
+    assert!(
+        err.contains("not-a-date"),
+        "should quote the bad date: {err}"
+    );
+    assert!(
+        err.contains("YYYY-MM-DD HH:MM:SS"),
+        "should describe expected format: {err}"
+    );
 }
 
 #[test]
@@ -150,7 +159,10 @@ fn parse_error_includes_file_path() {
     let err = parse_file(Path::new("/some/weird/path.md"), contents)
         .unwrap_err()
         .to_string();
-    assert!(err.contains("/some/weird/path.md"), "should include path: {err}");
+    assert!(
+        err.contains("/some/weird/path.md"),
+        "should include path: {err}"
+    );
 }
 
 // ---- parse errors: NEVER dump file contents ----
@@ -170,15 +182,25 @@ more secret stuff after the error
     let err = parse_file(p(), contents).unwrap_err().to_string();
     // The error should NOT contain unrelated file contents.
     assert!(!err.contains("SECRET_TOKEN"), "must not dump file: {err}");
-    assert!(!err.contains("huge unrelated markdown"), "must not dump file: {err}");
-    assert!(!err.contains("more secret stuff"), "must not dump file: {err}");
+    assert!(
+        !err.contains("huge unrelated markdown"),
+        "must not dump file: {err}"
+    );
+    assert!(
+        !err.contains("more secret stuff"),
+        "must not dump file: {err}"
+    );
     // Error must be short — one line, under a reasonable bound.
     assert!(
         err.lines().count() == 1,
         "error should be one line, got {}: {err}",
         err.lines().count()
     );
-    assert!(err.len() < 300, "error should be concise ({} chars): {err}", err.len());
+    assert!(
+        err.len() < 300,
+        "error should be concise ({} chars): {err}",
+        err.len()
+    );
 }
 
 #[test]

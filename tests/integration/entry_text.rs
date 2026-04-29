@@ -88,7 +88,10 @@ fn new_rejects_entry_exceeding_length_limit() {
     let (code, _, stderr) = run(dir.path(), &["new", "main", &long]);
     assert_ne!(code, 0);
     assert!(stderr.contains("too long"), "stderr: {stderr}");
-    assert!(stderr.contains("concise"), "stderr should tell user what to do: {stderr}");
+    assert!(
+        stderr.contains("concise"),
+        "stderr should tell user what to do: {stderr}"
+    );
     // File must not have been touched.
     assert!(!section_devlog(dir.path(), "main").exists());
 }

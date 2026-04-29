@@ -46,8 +46,7 @@ fn ambiguous_dst_fallback_date_parses_cleanly() {
 fn unambiguous_date_still_parses_as_before() {
     // Sanity: the `.earliest()` swap must not break the common case.
     let contents = "- 1 | 2026-04-14 11:02:37: normal\n";
-    let entries =
-        parse_file(Path::new("/fake/DEVLOG/main-devlog.md"), contents).expect("parse ok");
+    let entries = parse_file(Path::new("/fake/DEVLOG/main-devlog.md"), contents).expect("parse ok");
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].text, "normal");
 }

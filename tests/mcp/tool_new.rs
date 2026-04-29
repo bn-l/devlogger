@@ -80,14 +80,8 @@ async fn new_entry_increments_number_on_successive_calls() {
 #[tokio::test]
 async fn new_entry_creates_independent_sections() {
     let (server, dir) = fresh_server();
-    server
-        .devlog_new(new_args("alpha", "a1"))
-        .await
-        .unwrap();
-    server
-        .devlog_new(new_args("beta", "b1"))
-        .await
-        .unwrap();
+    server.devlog_new(new_args("alpha", "a1")).await.unwrap();
+    server.devlog_new(new_args("beta", "b1")).await.unwrap();
 
     assert!(section_file(dir.path(), "alpha").is_file());
     assert!(section_file(dir.path(), "beta").is_file());
@@ -132,7 +126,10 @@ async fn new_entry_writes_the_entry_to_disk() {
 
     let path = section_file(dir.path(), "store");
     let contents = std::fs::read_to_string(&path).unwrap();
-    assert!(contents.contains(": durable entry"), "contents={contents:?}");
+    assert!(
+        contents.contains(": durable entry"),
+        "contents={contents:?}"
+    );
     // Entry line must start with the canonical prefix.
     assert!(contents.lines().any(|l| l.starts_with("- 1 | ")));
 }

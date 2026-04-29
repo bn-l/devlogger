@@ -71,10 +71,7 @@ async fn parallel_mixed_sections_do_not_interfere() {
 
     for (section, count) in [("alpha", 8u32), ("beta", 8u32)] {
         let contents = std::fs::read_to_string(section_file(dir.path(), section)).unwrap();
-        let nums: HashSet<&str> = contents
-            .lines()
-            .filter(|l| l.starts_with("- "))
-            .collect();
+        let nums: HashSet<&str> = contents.lines().filter(|l| l.starts_with("- ")).collect();
         assert_eq!(nums.len() as u32, count, "section {section}");
     }
 }

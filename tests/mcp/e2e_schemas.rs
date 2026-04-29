@@ -12,10 +12,7 @@ use super::e2e_common::*;
 async fn listed_by_name(base: &std::path::Path) -> HashMap<String, Tool> {
     let client = spawn_subprocess_client(base).await;
     let tools = client.list_all_tools().await.expect("tools/list");
-    let map = tools
-        .into_iter()
-        .map(|t| (t.name.to_string(), t))
-        .collect();
+    let map = tools.into_iter().map(|t| (t.name.to_string(), t)).collect();
     client.cancel().await.ok();
     map
 }

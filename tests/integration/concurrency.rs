@@ -53,7 +53,10 @@ fn assert_no_merged_lines(path: &std::path::Path) {
     for (i, line) in contents.lines().enumerate() {
         // Every non-empty line in the file should either be prose (not our
         // case here) or a SINGLE entry — never two entries concatenated.
-        let dash_count = line.matches("- ").filter(|_| line.starts_with("- ")).count()
+        let dash_count = line
+            .matches("- ")
+            .filter(|_| line.starts_with("- "))
+            .count()
             + line.matches(" - ").count();
         // A merged entry would contain "- N | " more than once.
         let entry_prefix_count = line.matches(" | ").count();

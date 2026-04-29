@@ -38,9 +38,7 @@ pub fn client_info() -> ClientInfo {
 
 /// Boot the real `devlogger-mcp` binary pointed at `base` and return a
 /// connected rmcp client plus the `TempDir` that must outlive it.
-pub async fn spawn_subprocess_client(
-    base: &Path,
-) -> RunningService<RoleClient, ClientInfo> {
+pub async fn spawn_subprocess_client(base: &Path) -> RunningService<RoleClient, ClientInfo> {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_devlogger-mcp"));
     cmd.arg("--dir").arg(base);
     let transport = TokioChildProcess::new(cmd).expect("spawn devlogger-mcp");
@@ -73,9 +71,7 @@ pub async fn spawn_subprocess_client_with_env(
 /// cost but still exercises the full rmcp protocol layer: initialize
 /// handshake, tools/list, tools/call, JSON serialization of schemas and
 /// results.
-pub async fn spawn_inprocess_client(
-    base: &Path,
-) -> RunningService<RoleClient, ClientInfo> {
+pub async fn spawn_inprocess_client(base: &Path) -> RunningService<RoleClient, ClientInfo> {
     let (server_io, client_io) = tokio::io::duplex(64 * 1024);
     let base = base.to_path_buf();
     tokio::spawn(async move {
@@ -123,9 +119,7 @@ pub async fn call_new(
     .await
 }
 
-pub async fn call_sections(
-    client: &RunningService<RoleClient, ClientInfo>,
-) -> CallToolResult {
+pub async fn call_sections(client: &RunningService<RoleClient, ClientInfo>) -> CallToolResult {
     call(client, "devlog_sections", json!({})).await
 }
 

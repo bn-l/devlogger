@@ -17,9 +17,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use tokio::time::timeout;
 
-async fn read_line(
-    reader: &mut BufReader<tokio::process::ChildStdout>,
-) -> String {
+async fn read_line(reader: &mut BufReader<tokio::process::ChildStdout>) -> String {
     let mut buf = String::new();
     timeout(Duration::from_secs(10), reader.read_line(&mut buf))
         .await
@@ -127,19 +125,14 @@ async fn every_line_on_stdout_is_a_valid_jsonrpc_frame_even_with_rust_log_trace(
             continue;
         }
         serde_json::from_str::<Value>(trimmed).unwrap_or_else(|e| {
-            panic!(
-                "stdout leftover line {idx} is not valid JSON-RPC: {e}\nline: {trimmed:?}"
-            )
+            panic!("stdout leftover line {idx} is not valid JSON-RPC: {e}\nline: {trimmed:?}")
         });
     }
 
     // stderr is allowed to contain log output under RUST_LOG=trace;
     // just confirm it didn't crash.
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        !stderr.contains("panicked"),
-        "server panicked: {stderr}"
-    );
+    assert!(!stderr.contains("panicked"), "server panicked: {stderr}");
 }
 
 #[tokio::test]
@@ -219,9 +212,8 @@ async fn startup_log_goes_to_stderr_not_stdout_when_enabled() {
         if trimmed.is_empty() {
             continue;
         }
-        serde_json::from_str::<Value>(trimmed).unwrap_or_else(|e| {
-            panic!("stdout line {idx} not valid JSON-RPC: {e}: {trimmed:?}")
-        });
+        serde_json::from_str::<Value>(trimmed)
+            .unwrap_or_else(|e| panic!("stdout line {idx} not valid JSON-RPC: {e}: {trimmed:?}"));
     }
 }
 

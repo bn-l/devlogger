@@ -40,12 +40,18 @@ async fn do_handshake(
             "clientInfo": { "name": "log-test", "version": "0" }
         }
     });
-    stdin.write_all(format!("{init}\n").as_bytes()).await.unwrap();
+    stdin
+        .write_all(format!("{init}\n").as_bytes())
+        .await
+        .unwrap();
     let resp = read_response(reader).await;
     assert_eq!(resp["id"], 1);
 
     let notif = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
-    stdin.write_all(format!("{notif}\n").as_bytes()).await.unwrap();
+    stdin
+        .write_all(format!("{notif}\n").as_bytes())
+        .await
+        .unwrap();
 }
 
 /// Send a tools/call and read the response.
@@ -61,7 +67,10 @@ async fn do_tool_call(
         "method": "tools/call",
         "params": { "name": tool, "arguments": arguments }
     });
-    stdin.write_all(format!("{call}\n").as_bytes()).await.unwrap();
+    stdin
+        .write_all(format!("{call}\n").as_bytes())
+        .await
+        .unwrap();
     read_response(reader).await
 }
 
@@ -88,9 +97,13 @@ async fn server_does_not_crash_when_log_dir_is_unwritable() {
 
     // Tool calls must still work.
     let resp = do_tool_call(
-        &mut stdin, &mut reader, 2,
-        "devlog_new", json!({"section": "log", "text": "unwritable log dir"}),
-    ).await;
+        &mut stdin,
+        &mut reader,
+        2,
+        "devlog_new",
+        json!({"section": "log", "text": "unwritable log dir"}),
+    )
+    .await;
     assert!(resp["result"]["isError"].is_null() || resp["result"]["isError"] == false);
 
     stdin.shutdown().await.ok();
@@ -127,9 +140,13 @@ async fn server_does_not_crash_when_home_is_unset() {
     do_handshake(&mut stdin, &mut reader).await;
 
     let resp = do_tool_call(
-        &mut stdin, &mut reader, 2,
-        "devlog_new", json!({"section": "log", "text": "no home"}),
-    ).await;
+        &mut stdin,
+        &mut reader,
+        2,
+        "devlog_new",
+        json!({"section": "log", "text": "no home"}),
+    )
+    .await;
     assert!(resp["result"]["isError"].is_null() || resp["result"]["isError"] == false);
 
     stdin.shutdown().await.ok();
@@ -148,7 +165,8 @@ async fn log_file_is_created_at_devlogger_log_dir() {
     let client = spawn_subprocess_client_with_env(
         base_dir.path(),
         &[("DEVLOGGER_LOG_DIR", log_dir.path().to_str().unwrap())],
-    ).await;
+    )
+    .await;
 
     // Do some work.
     assert_wire_ok(&call_new(&client, "log", "test entry").await);
@@ -162,7 +180,8 @@ async fn log_file_is_created_at_devlogger_log_dir() {
         .filter_map(|e| e.ok())
         .collect();
     assert_eq!(
-        entries.len(), 1,
+        entries.len(),
+        1,
         "expected exactly one log file, got: {entries:?}"
     );
 
@@ -181,7 +200,10 @@ async fn log_file_is_created_at_devlogger_log_dir() {
             panic!("log line {i} is not valid JSON: {e}\nline: {line}");
         });
         // Must have standard tracing fields.
-        assert!(parsed.get("timestamp").is_some(), "line {i} missing timestamp");
+        assert!(
+            parsed.get("timestamp").is_some(),
+            "line {i} missing timestamp"
+        );
         assert!(parsed.get("level").is_some(), "line {i} missing level");
     }
 }
@@ -193,7 +215,8 @@ async fn log_file_contains_tool_completion_records() {
     let client = spawn_subprocess_client_with_env(
         base_dir.path(),
         &[("DEVLOGGER_LOG_DIR", log_dir.path().to_str().unwrap())],
-    ).await;
+    )
+    .await;
 
     // Success call.
     assert_wire_ok(&call_new(&client, "core", "good entry").await);
@@ -241,9 +264,9 @@ async fn log_file_contains_tool_completion_records() {
     assert!(s["fields"]["pid"].is_number(), "missing pid");
 
     // Check the error record.
-    let error_line = tool_lines.iter().find(|v| {
-        v["fields"]["result"].as_str() == Some("tool_error")
-    });
+    let error_line = tool_lines
+        .iter()
+        .find(|v| v["fields"]["result"].as_str() == Some("tool_error"));
     assert!(error_line.is_some(), "no tool_error record found");
 }
 
@@ -255,7 +278,8 @@ async fn log_file_does_not_contain_entry_text() {
     let client = spawn_subprocess_client_with_env(
         base_dir.path(),
         &[("DEVLOGGER_LOG_DIR", log_dir.path().to_str().unwrap())],
-    ).await;
+    )
+    .await;
 
     let secret = "super-secret-entry-text-that-must-not-leak";
     assert_wire_ok(&call_new(&client, "core", secret).await);
@@ -295,9 +319,13 @@ async fn stdout_stays_clean_when_log_dir_is_unwritable() {
     do_handshake(&mut stdin, &mut reader).await;
 
     let resp = do_tool_call(
-        &mut stdin, &mut reader, 2,
-        "devlog_new", json!({"section": "x", "text": "y"}),
-    ).await;
+        &mut stdin,
+        &mut reader,
+        2,
+        "devlog_new",
+        json!({"section": "x", "text": "y"}),
+    )
+    .await;
     assert_eq!(resp["id"], 2);
 
     stdin.shutdown().await.ok();
@@ -329,7 +357,8 @@ async fn concurrent_tool_calls_produce_intact_log_lines() {
     let client = spawn_subprocess_client_with_env(
         base_dir.path(),
         &[("DEVLOGGER_LOG_DIR", log_dir.path().to_str().unwrap())],
-    ).await;
+    )
+    .await;
     let client = Arc::new(client);
 
     const N: usize = 100;

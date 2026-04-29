@@ -64,7 +64,10 @@ fn update_by_ambiguous_number_does_not_mutate_file() {
     assert_ne!(code, 0);
 
     let after = std::fs::read_to_string(&path).unwrap();
-    assert_eq!(before, after, "file should be untouched after ambiguity error");
+    assert_eq!(
+        before, after,
+        "file should be untouched after ambiguity error"
+    );
 }
 
 #[test]

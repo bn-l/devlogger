@@ -22,9 +22,12 @@ async fn initialize_completes_and_reports_crate_identity() {
 #[tokio::test]
 async fn initialize_completes_within_ten_seconds() {
     let base = fresh_base();
-    let client = tokio::time::timeout(Duration::from_secs(10), spawn_subprocess_client(base.path()))
-        .await
-        .expect("initialize should not time out");
+    let client = tokio::time::timeout(
+        Duration::from_secs(10),
+        spawn_subprocess_client(base.path()),
+    )
+    .await
+    .expect("initialize should not time out");
     client.cancel().await.ok();
 }
 
@@ -73,8 +76,7 @@ async fn tools_list_exposes_the_full_devlog_surface() {
     let base = fresh_base();
     let client = spawn_subprocess_client(base.path()).await;
     let tools = client.list_all_tools().await.expect("tools/list");
-    let names: std::collections::HashSet<&str> =
-        tools.iter().map(|t| t.name.as_ref()).collect();
+    let names: std::collections::HashSet<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
     for expected in [
         "devlog_new",
         "devlog_list",

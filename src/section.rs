@@ -30,9 +30,7 @@ pub fn validate_section_name(name: &str) -> Result<()> {
             'a'..='z' => prev_hyphen = false,
             '-' => {
                 if prev_hyphen {
-                    bail!(
-                        "invalid section name '{name}': consecutive hyphens at position {i}"
-                    );
+                    bail!("invalid section name '{name}': consecutive hyphens at position {i}");
                 }
                 prev_hyphen = true;
             }

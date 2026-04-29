@@ -17,20 +17,14 @@ async fn empty_section_name_is_tool_error_not_protocol() {
 #[tokio::test]
 async fn leading_hyphen_section_is_tool_error() {
     let (server, _dir) = fresh_server();
-    let result = server
-        .devlog_new(new_args("-bad", "text"))
-        .await
-        .unwrap();
+    let result = server.devlog_new(new_args("-bad", "text")).await.unwrap();
     assert_err(&result);
 }
 
 #[tokio::test]
 async fn trailing_hyphen_section_is_tool_error() {
     let (server, _dir) = fresh_server();
-    let result = server
-        .devlog_new(new_args("bad-", "text"))
-        .await
-        .unwrap();
+    let result = server.devlog_new(new_args("bad-", "text")).await.unwrap();
     assert_err(&result);
 }
 

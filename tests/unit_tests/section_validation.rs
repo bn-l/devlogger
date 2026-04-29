@@ -35,8 +35,14 @@ fn rejects_empty() {
 fn rejects_bare_digit_five() {
     // The user specifically called out that a section named "5" is an error.
     let err = validate_section_name("5").unwrap_err().to_string();
-    assert!(err.contains("illegal character '5'"), "unexpected error: {err}");
-    assert!(err.contains("position 0"), "error should name the offending position: {err}");
+    assert!(
+        err.contains("illegal character '5'"),
+        "unexpected error: {err}"
+    );
+    assert!(
+        err.contains("position 0"),
+        "error should name the offending position: {err}"
+    );
 }
 
 #[test]
@@ -49,7 +55,10 @@ fn rejects_digits_in_name() {
 #[test]
 fn rejects_uppercase() {
     let err = validate_section_name("Foo").unwrap_err().to_string();
-    assert!(err.contains("illegal character 'F'"), "unexpected error: {err}");
+    assert!(
+        err.contains("illegal character 'F'"),
+        "unexpected error: {err}"
+    );
 }
 
 #[test]
@@ -90,19 +99,28 @@ fn rejects_non_ascii_letters() {
 #[test]
 fn rejects_leading_hyphen() {
     let err = validate_section_name("-foo").unwrap_err().to_string();
-    assert!(err.contains("must not start with '-'"), "unexpected error: {err}");
+    assert!(
+        err.contains("must not start with '-'"),
+        "unexpected error: {err}"
+    );
 }
 
 #[test]
 fn rejects_trailing_hyphen() {
     let err = validate_section_name("foo-").unwrap_err().to_string();
-    assert!(err.contains("must not end with '-'"), "unexpected error: {err}");
+    assert!(
+        err.contains("must not end with '-'"),
+        "unexpected error: {err}"
+    );
 }
 
 #[test]
 fn rejects_consecutive_hyphens() {
     let err = validate_section_name("foo--bar").unwrap_err().to_string();
-    assert!(err.contains("consecutive hyphens"), "unexpected error: {err}");
+    assert!(
+        err.contains("consecutive hyphens"),
+        "unexpected error: {err}"
+    );
 }
 
 #[test]
@@ -120,5 +138,8 @@ fn rejects_only_hyphen() {
 #[test]
 fn error_quotes_the_bad_name() {
     let err = validate_section_name("Bad Name").unwrap_err().to_string();
-    assert!(err.contains("'Bad Name'"), "error should quote the name: {err}");
+    assert!(
+        err.contains("'Bad Name'"),
+        "error should quote the name: {err}"
+    );
 }

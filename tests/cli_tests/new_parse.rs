@@ -32,8 +32,7 @@ fn new_with_three_args_is_error() {
 fn new_preserves_entry_whitespace_inside_quotes() {
     // On the CLI this would be passed via shell quoting; the argv entry
     // retains internal whitespace.
-    let cli =
-        Cli::try_parse_from(["devlogger", "new", "backend", "  spaced  text  "]).unwrap();
+    let cli = Cli::try_parse_from(["devlogger", "new", "backend", "  spaced  text  "]).unwrap();
     match cli.command {
         Command::New { args } => assert_eq!(args, vec!["backend", "  spaced  text  "]),
         _ => panic!(),

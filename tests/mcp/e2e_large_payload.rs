@@ -129,10 +129,7 @@ async fn long_section_name_writes_and_reads_back() {
     let base = fresh_base();
     let client = spawn_subprocess_client(base.path()).await;
 
-    let section: String = (0..20)
-        .map(|_| "abcdefghij")
-        .collect::<Vec<_>>()
-        .join("-");
+    let section: String = (0..20).map(|_| "abcdefghij").collect::<Vec<_>>().join("-");
     assert_eq!(section.len(), 20 * 10 + 19);
 
     let r = call_new(&client, &section, "ok").await;

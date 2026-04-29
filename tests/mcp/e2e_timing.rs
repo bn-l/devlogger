@@ -224,14 +224,26 @@ async fn every_tool_call_completes_in_milliseconds() {
     };
 
     let steps = vec![
-        call("devlog_new", json!({ "section": "timing", "text": "first" })),
-        call("devlog_new", json!({ "section": "timing", "text": "second" })),
+        call(
+            "devlog_new",
+            json!({ "section": "timing", "text": "first" }),
+        ),
+        call(
+            "devlog_new",
+            json!({ "section": "timing", "text": "second" }),
+        ),
         call("devlog_sections", json!({})),
         call("devlog_list", json!({ "section": "timing" })),
         call("devlog_list", json!({})),
         call("devlog_read", json!({ "section": "timing" })),
-        call("devlog_update", json!({ "section": "timing", "id": "1", "text": "first, rewritten" })),
-        call("devlog_move", json!({ "from_section": "timing", "id": "2", "to_section": "elsewhere" })),
+        call(
+            "devlog_update",
+            json!({ "section": "timing", "id": "1", "text": "first, rewritten" }),
+        ),
+        call(
+            "devlog_move",
+            json!({ "from_section": "timing", "id": "2", "to_section": "elsewhere" }),
+        ),
     ];
 
     eprintln!("--- per-tool round-trip latencies ---");

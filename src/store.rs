@@ -88,8 +88,7 @@ pub fn append_line(path: &Path, line: &str, line_ending: &str) -> Result<()> {
     }
 
     let existing = if path.exists() {
-        fs::read_to_string(path)
-            .wrap_err_with(|| format!("failed to read {}", path.display()))?
+        fs::read_to_string(path).wrap_err_with(|| format!("failed to read {}", path.display()))?
     } else {
         String::new()
     };
@@ -101,8 +100,9 @@ pub fn append_line(path: &Path, line: &str, line_ending: &str) -> Result<()> {
         .open(path)
         .wrap_err_with(|| format!("failed to open {}", path.display()))?;
 
-    let mut buf: Vec<u8> =
-        Vec::with_capacity(line.len() + line_ending.len() + if needs_leading { line_ending.len() } else { 0 });
+    let mut buf: Vec<u8> = Vec::with_capacity(
+        line.len() + line_ending.len() + if needs_leading { line_ending.len() } else { 0 },
+    );
     if needs_leading {
         buf.extend_from_slice(line_ending.as_bytes());
     }
@@ -128,12 +128,7 @@ pub fn rewrite_file(path: &Path, contents: &str) -> Result<()> {
 
     fs::write(&tmp, contents)
         .wrap_err_with(|| format!("failed to write tmp file {}", tmp.display()))?;
-    fs::rename(&tmp, path).wrap_err_with(|| {
-        format!(
-            "failed to rename {} to {}",
-            tmp.display(),
-            path.display()
-        )
-    })?;
+    fs::rename(&tmp, path)
+        .wrap_err_with(|| format!("failed to rename {} to {}", tmp.display(), path.display()))?;
     Ok(())
 }

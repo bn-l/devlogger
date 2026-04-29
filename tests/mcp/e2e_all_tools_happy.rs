@@ -71,7 +71,10 @@ async fn devlog_list_with_section_over_wire_returns_ordered_entries() {
     let arr = structured(&result).as_array().unwrap();
     assert_eq!(arr.len(), 3);
     for (i, v) in arr.iter().enumerate() {
-        assert_eq!(v.get("number").and_then(|n| n.as_u64()).unwrap(), (i + 1) as u64);
+        assert_eq!(
+            v.get("number").and_then(|n| n.as_u64()).unwrap(),
+            (i + 1) as u64
+        );
     }
     client.cancel().await.ok();
 }
@@ -114,9 +117,7 @@ async fn devlog_read_full_over_wire_returns_exact_file_bytes() {
     assert_wire_ok(&result);
     assert_eq!(text_content(&result), disk);
     assert_eq!(
-        structured(&result)
-            .get("contents")
-            .and_then(|v| v.as_str()),
+        structured(&result).get("contents").and_then(|v| v.as_str()),
         Some(disk.as_str())
     );
     client.cancel().await.ok();
@@ -166,7 +167,10 @@ async fn devlog_update_over_wire_preserves_number_and_date() {
     let s = structured(&updated);
     assert_eq!(s.get("number").and_then(|v| v.as_u64()), Some(1));
     assert_eq!(s.get("text").and_then(|v| v.as_str()), Some("after"));
-    assert_eq!(s.get("date").and_then(|v| v.as_str()), Some(original_date.as_str()));
+    assert_eq!(
+        s.get("date").and_then(|v| v.as_str()),
+        Some(original_date.as_str())
+    );
 
     client.cancel().await.ok();
 }

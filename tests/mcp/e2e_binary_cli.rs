@@ -32,11 +32,7 @@ async fn help_flag_prints_usage_and_exits_zero() {
 
 #[tokio::test]
 async fn short_help_flag_works() {
-    let out = Command::new(bin())
-        .arg("-h")
-        .output()
-        .await
-        .expect("spawn");
+    let out = Command::new(bin()).arg("-h").output().await.expect("spawn");
     assert!(out.status.success(), "-h should exit 0");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("Usage:"), "missing Usage: {stdout}");

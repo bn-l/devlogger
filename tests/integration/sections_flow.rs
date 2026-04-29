@@ -59,5 +59,8 @@ fn sections_reflects_added_sections_across_invocations() {
 
     run_ok(dir.path(), &["new", "frontend", "f1"]);
     let out2 = run_ok(dir.path(), &["sections"]);
-    assert_eq!(out2.lines().collect::<Vec<_>>(), vec!["backend", "frontend"]);
+    assert_eq!(
+        out2.lines().collect::<Vec<_>>(),
+        vec!["backend", "frontend"]
+    );
 }

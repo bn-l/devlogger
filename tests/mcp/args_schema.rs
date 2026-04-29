@@ -21,7 +21,9 @@ fn required(schema: &Value) -> Vec<&str> {
 }
 
 fn properties(schema: &Value) -> &Value {
-    schema.get("properties").expect("schema should have properties")
+    schema
+        .get("properties")
+        .expect("schema should have properties")
 }
 
 #[test]
@@ -42,7 +44,10 @@ fn new_args_schema_has_required_section_and_text() {
 fn list_args_schema_has_no_required_fields() {
     let s = schema_json::<ListArgs>();
     let req = required(&s);
-    assert!(req.is_empty(), "ListArgs has no required fields; got {req:?}");
+    assert!(
+        req.is_empty(),
+        "ListArgs has no required fields; got {req:?}"
+    );
 }
 
 #[test]
@@ -60,7 +65,10 @@ fn update_args_schema_requires_section_id_and_text() {
     let s = schema_json::<UpdateArgs>();
     let req = required(&s);
     for field in ["section", "id", "text"] {
-        assert!(req.contains(&field), "missing required field {field}: {req:?}");
+        assert!(
+            req.contains(&field),
+            "missing required field {field}: {req:?}"
+        );
     }
     assert!(!req.contains(&"base_dir"), "base_dir must be optional");
 }
@@ -82,7 +90,10 @@ fn move_args_schema_requires_from_section_id_and_to_section() {
     let s = schema_json::<MoveArgs>();
     let req = required(&s);
     for field in ["from_section", "id", "to_section"] {
-        assert!(req.contains(&field), "missing required field {field}: {req:?}");
+        assert!(
+            req.contains(&field),
+            "missing required field {field}: {req:?}"
+        );
     }
     assert!(!req.contains(&"base_dir"), "base_dir must be optional");
 

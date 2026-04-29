@@ -84,10 +84,7 @@ async fn concurrent_mixed_tool_calls_do_not_cross_contaminate() {
     // After the dust settles, every section should have exactly 4 entries.
     for section in ["alpha", "beta", "gamma"] {
         let contents = std::fs::read_to_string(section_file(base.path(), section)).unwrap();
-        let nums: HashSet<&str> = contents
-            .lines()
-            .filter(|l| l.starts_with("- "))
-            .collect();
+        let nums: HashSet<&str> = contents.lines().filter(|l| l.starts_with("- ")).collect();
         assert_eq!(nums.len(), 4, "section {section}");
     }
 

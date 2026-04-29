@@ -27,7 +27,10 @@ async fn list_single_section_structured_is_array_of_entries() {
 
     let result = server.devlog_list(list_args(Some("core"))).await.unwrap();
     let s = structured(&result);
-    assert!(s.is_array(), "single-section list should return a JSON array");
+    assert!(
+        s.is_array(),
+        "single-section list should return a JSON array"
+    );
 
     let first = &s.as_array().unwrap()[0];
     for field in ["number", "date", "text", "line"] {
@@ -72,10 +75,7 @@ async fn read_structured_wraps_contents_in_object() {
     let (server, _dir) = fresh_server();
     server.devlog_new(new_args("core", "x")).await.unwrap();
 
-    let result = server
-        .devlog_read(read_args("core", None))
-        .await
-        .unwrap();
+    let result = server.devlog_read(read_args("core", None)).await.unwrap();
     let s = structured(&result);
     assert!(s.is_object());
     assert!(s.get("contents").and_then(|v| v.as_str()).is_some());
@@ -84,10 +84,7 @@ async fn read_structured_wraps_contents_in_object() {
 #[tokio::test]
 async fn tool_errors_flip_is_error_and_still_carry_content() {
     let (server, _dir) = fresh_server();
-    let result = server
-        .devlog_read(read_args("nope", None))
-        .await
-        .unwrap();
+    let result = server.devlog_read(read_args("nope", None)).await.unwrap();
     assert!(is_error(&result));
     assert!(!result.content.is_empty(), "error must carry a message");
     let msg = text_of(&result);
