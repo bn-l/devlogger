@@ -36,9 +36,11 @@ use rmcp::{
     service::RequestContext,
     tool, tool_handler, tool_router,
 };
+use tokio::sync::{Semaphore, oneshot};
 
 use crate::commands::{
-    cmd_list, cmd_list_all, cmd_move, cmd_new, cmd_read, cmd_sections, cmd_update,
+    cmd_list, cmd_list_all, cmd_move, cmd_new_prevalidated, cmd_read, cmd_sections,
+    cmd_update_prevalidated, prepare_new_path, prepare_update_path,
 };
 use crate::entry::DATE_FORMAT;
 use crate::mcp::args::{ListArgs, MoveArgs, NewArgs, ReadArgs, SectionsArgs, UpdateArgs};
@@ -71,11 +73,14 @@ impl std::fmt::Display for ResultClass {
 #[derive(Clone)]
 pub struct DevlogServer {
     default_base: Arc<PathBuf>,
+    file_workers: Arc<Semaphore>,
     // The `#[tool_router]` macro drives this field through its generated
     // `call_tool` path; rustc's dead-code pass doesn't see that read.
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
+
+const MAX_FILE_WORKERS: usize = 16;
 
 #[tool_router]
 impl DevlogServer {
@@ -83,6 +88,7 @@ impl DevlogServer {
     pub fn new(default_base: PathBuf) -> Self {
         Self {
             default_base: Arc::new(default_base),
+            file_workers: Arc::new(Semaphore::new(MAX_FILE_WORKERS)),
             tool_router: Self::tool_router(),
         }
     }
@@ -98,6 +104,36 @@ impl DevlogServer {
             Some(s) if !s.is_empty() => PathBuf::from(s),
             _ => (*self.default_base).clone(),
         }
+    }
+
+    /// Run blocking devlog file work on bounded dedicated worker threads
+    /// instead of Tokio's global blocking pool. rmcp's stdio transport
+    /// also uses Tokio blocking threads for stdin/stdout; sharing that
+    /// pool with file locks can starve the transport itself.
+    async fn run_file_task<T, F>(&self, f: F) -> Result<eyre::Result<T>, McpError>
+    where
+        T: Send + 'static,
+        F: FnOnce() -> eyre::Result<T> + Send + 'static,
+    {
+        let permit = self
+            .file_workers
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|e| McpError::internal_error(format!("file worker closed: {e}"), None))?;
+        let (tx, rx) = oneshot::channel();
+        std::thread::Builder::new()
+            .name("devlogger-file-worker".to_string())
+            .spawn(move || {
+                let result = f();
+                drop(permit);
+                let _ = tx.send(result);
+            })
+            .map_err(|e| {
+                McpError::internal_error(format!("failed to spawn file worker: {e}"), None)
+            })?;
+        rx.await
+            .map_err(|e| McpError::internal_error(format!("file worker terminated: {e}"), None))
     }
 
     #[tool(name = "devlog_new")]
@@ -130,11 +166,19 @@ impl DevlogServer {
         let base = self.resolve_base(args.base_dir.as_deref());
         let section = args.section;
         let text = args.text;
-        let result = tokio::task::spawn_blocking(move || cmd_new(&base, &section, &text))
+        let path = match prepare_new_path(&base, &section, &text) {
+            Ok(path) => path,
+            Err(e) => {
+                log_tool_call("devlog_new", started.elapsed(), ResultClass::ToolError);
+                return Ok(tool_error(format_report(&e)));
+            }
+        };
+        let result = self
+            .run_file_task(move || cmd_new_prevalidated(&path, &text))
             .await
             .map_err(|e| {
                 log_tool_call("devlog_new", started.elapsed(), ResultClass::ProtocolError);
-                join_error(e)
+                e
             })?;
         match result {
             Ok(entry) => {
@@ -180,11 +224,12 @@ impl DevlogServer {
         let base = self.resolve_base(args.base_dir.as_deref());
         match args.section {
             Some(section) => {
-                let result = tokio::task::spawn_blocking(move || cmd_list(&base, &section))
+                let result = self
+                    .run_file_task(move || cmd_list(&base, &section))
                     .await
                     .map_err(|e| {
                         log_tool_call("devlog_list", started.elapsed(), ResultClass::ProtocolError);
-                        join_error(e)
+                        e
                     })?;
                 match result {
                     Ok(entries) => {
@@ -204,11 +249,12 @@ impl DevlogServer {
                 }
             }
             None => {
-                let result = tokio::task::spawn_blocking(move || cmd_list_all(&base))
+                let result = self
+                    .run_file_task(move || cmd_list_all(&base))
                     .await
                     .map_err(|e| {
                         log_tool_call("devlog_list", started.elapsed(), ResultClass::ProtocolError);
-                        join_error(e)
+                        e
                     })?;
                 match result {
                     Ok(groups) => {
@@ -256,11 +302,16 @@ impl DevlogServer {
     ) -> Result<CallToolResult, McpError> {
         let started = std::time::Instant::now();
         let base = self.resolve_base(args.base_dir.as_deref());
-        let result = tokio::task::spawn_blocking(move || cmd_sections(&base))
+        let result = self
+            .run_file_task(move || cmd_sections(&base))
             .await
             .map_err(|e| {
-                log_tool_call("devlog_sections", started.elapsed(), ResultClass::ProtocolError);
-                join_error(e)
+                log_tool_call(
+                    "devlog_sections",
+                    started.elapsed(),
+                    ResultClass::ProtocolError,
+                );
+                e
             })?;
         match result {
             Ok(names) => {
@@ -301,13 +352,24 @@ impl DevlogServer {
         let section = args.section;
         let id = args.id;
         let text = args.text;
-        let result =
-            tokio::task::spawn_blocking(move || cmd_update(&base, &section, &id, &text))
-                .await
-                .map_err(|e| {
-                    log_tool_call("devlog_update", started.elapsed(), ResultClass::ProtocolError);
-                    join_error(e)
-                })?;
+        let path = match prepare_update_path(&base, &section, &text) {
+            Ok(path) => path,
+            Err(e) => {
+                log_tool_call("devlog_update", started.elapsed(), ResultClass::ToolError);
+                return Ok(tool_error(format_report(&e)));
+            }
+        };
+        let result = self
+            .run_file_task(move || cmd_update_prevalidated(&path, &id, &text))
+            .await
+            .map_err(|e| {
+                log_tool_call(
+                    "devlog_update",
+                    started.elapsed(),
+                    ResultClass::ProtocolError,
+                );
+                e
+            })?;
         match result {
             Ok(entry) => {
                 log_tool_call("devlog_update", started.elapsed(), ResultClass::Success);
@@ -338,11 +400,12 @@ impl DevlogServer {
         let base = self.resolve_base(args.base_dir.as_deref());
         let section = args.section;
         let n = args.n;
-        let result = tokio::task::spawn_blocking(move || cmd_read(&base, &section, n))
+        let result = self
+            .run_file_task(move || cmd_read(&base, &section, n))
             .await
             .map_err(|e| {
                 log_tool_call("devlog_read", started.elapsed(), ResultClass::ProtocolError);
-                join_error(e)
+                e
             })?;
         match result {
             Ok(contents) => {
@@ -377,11 +440,12 @@ impl DevlogServer {
         let from = args.from_section;
         let id = args.id;
         let to = args.to_section;
-        let result = tokio::task::spawn_blocking(move || cmd_move(&base, &from, &id, &to))
+        let result = self
+            .run_file_task(move || cmd_move(&base, &from, &id, &to))
             .await
             .map_err(|e| {
                 log_tool_call("devlog_move", started.elapsed(), ResultClass::ProtocolError);
-                join_error(e)
+                e
             })?;
         match result {
             Ok(entry) => {
@@ -460,11 +524,6 @@ impl ServerHandler for DevlogServer {
         );
         info
     }
-}
-
-/// Map a `tokio::task::JoinError` into a protocol-level `McpError`.
-fn join_error(e: tokio::task::JoinError) -> McpError {
-    McpError::internal_error(format!("blocking task failed: {e}"), None)
 }
 
 /// Format an `eyre::Report` with its full cause chain, matching the CLI's

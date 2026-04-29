@@ -17,9 +17,12 @@ use std::sync::Mutex;
 use clap::Parser;
 use rmcp::{ServiceExt, transport::stdio};
 use tracing_subscriber::EnvFilter;
-use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::layer::{Layer as _, SubscriberExt};
 
 use devlogger::mcp::DevlogServer;
+
+const DEFAULT_STDERR_FILTER: &str = "warn,devlogger_mcp=info";
+const FILE_LOG_FILTER: &str = "warn,devlogger::mcp::server=info,devlogger_mcp=info";
 
 #[derive(Debug, Parser)]
 #[command(
@@ -48,10 +51,7 @@ fn log_dir() -> Option<PathBuf> {
     if let Some(d) = std::env::var_os("DEVLOGGER_LOG_DIR") {
         return Some(PathBuf::from(d));
     }
-    std::env::var_os("HOME").map(|h| {
-        PathBuf::from(h)
-            .join(".local/share/devlogger/logs")
-    })
+    std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share/devlogger/logs"))
 }
 
 /// Try to open (or create) today's log file in append mode.  Returns
@@ -69,14 +69,20 @@ fn open_log_file() -> Option<std::fs::File> {
         .ok()
 }
 
-fn main() -> ExitCode {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("warn,devlogger=info,devlogger_mcp=info"));
+fn stderr_filter() -> EnvFilter {
+    EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(DEFAULT_STDERR_FILTER))
+}
 
+fn file_log_filter() -> EnvFilter {
+    EnvFilter::new(FILE_LOG_FILTER)
+}
+
+fn main() -> ExitCode {
     // Stderr layer — human-readable, always active.
     let stderr_layer = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stderr)
-        .with_ansi(false);
+        .with_ansi(false)
+        .with_filter(stderr_filter());
 
     // File layer — structured JSONL, best-effort.  Uses synchronous
     // Mutex<File> writes — fine for this low-volume server and
@@ -85,14 +91,13 @@ fn main() -> ExitCode {
         tracing_subscriber::fmt::layer()
             .json()
             .with_writer(Mutex::new(file))
+            .with_filter(file_log_filter())
     });
 
     let subscriber = tracing_subscriber::registry()
-        .with(filter)
         .with(stderr_layer)
         .with(file_layer);
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("failed to set tracing subscriber");
+    tracing::subscriber::set_global_default(subscriber).expect("failed to set tracing subscriber");
 
     let args = Args::parse();
 

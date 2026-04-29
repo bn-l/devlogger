@@ -11,13 +11,9 @@ use eyre::{Result, WrapErr, bail};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::entry::{
-    DATE_FORMAT, Entry, detect_line_ending, parse_file, validate_entry_text,
-};
+use crate::entry::{DATE_FORMAT, Entry, detect_line_ending, parse_file, validate_entry_text};
 use crate::section::{section_devlog_path, validate_section_name};
-use crate::store::{
-    acquire_lock_for, append_line, load_entries, read_contents, rewrite_file,
-};
+use crate::store::{acquire_lock_for, append_line, load_entries, read_contents, rewrite_file};
 
 /// Resolve the devlog file path for a section.  Validates the section name.
 pub fn resolve_path(base: &Path, section: &str) -> Result<PathBuf> {
@@ -29,16 +25,29 @@ pub fn resolve_path(base: &Path, section: &str) -> Result<PathBuf> {
 /// Holds an exclusive lock across the read-compute-write so parallel
 /// invocations cannot produce duplicate numbers or interleaved writes.
 pub fn cmd_new(base: &Path, section: &str, text: &str) -> Result<Entry> {
+    let path = prepare_new_path(base, section, text)?;
+    cmd_new_prevalidated(&path, text)
+}
+
+/// Validate the cheap, CPU-only `new` inputs and return the canonical
+/// devlog path.  MCP handlers call this before entering blocking file
+/// work so validation errors cannot queue behind file locks or I/O.
+pub fn prepare_new_path(base: &Path, section: &str, text: &str) -> Result<PathBuf> {
     validate_entry_text(text)?;
-    let path = resolve_path(base, section)?;
-    let _lock = acquire_lock_for(&path)?;
+    resolve_path(base, section)
+}
+
+/// Append a new entry after `section` and `text` have already been
+/// validated.  This is the blocking file-work part of [`cmd_new`].
+pub fn cmd_new_prevalidated(path: &Path, text: &str) -> Result<Entry> {
+    let _lock = acquire_lock_for(path)?;
 
     let existing_contents = if path.exists() {
-        read_contents(&path)?
+        read_contents(path)?
     } else {
         String::new()
     };
-    let existing = parse_file(&path, &existing_contents)?;
+    let existing = parse_file(path, &existing_contents)?;
     let next_number = match existing.iter().map(|e| e.number).max() {
         None => 1,
         Some(max) => max.checked_add(1).ok_or_else(|| {
@@ -53,7 +62,7 @@ pub fn cmd_new(base: &Path, section: &str, text: &str) -> Result<Entry> {
     let line_ending = detect_line_ending(&existing_contents);
 
     let entry = Entry::new(next_number, Local::now(), text);
-    append_line(&path, &entry.to_line(), line_ending)?;
+    append_line(path, &entry.to_line(), line_ending)?;
 
     Ok(entry)
 }
@@ -98,8 +107,7 @@ pub fn cmd_sections(base: &Path) -> Result<Vec<String>> {
 
     let mut sections = Vec::new();
     for dirent in read_dir {
-        let dirent =
-            dirent.wrap_err_with(|| format!("failed to read {}", devlog_dir.display()))?;
+        let dirent = dirent.wrap_err_with(|| format!("failed to read {}", devlog_dir.display()))?;
         let path = dirent.path();
         if !path.is_dir() {
             continue;
@@ -129,21 +137,29 @@ pub fn cmd_sections(base: &Path) -> Result<Vec<String>> {
 /// hand-edited file do not cause the wrong line to be rewritten.
 /// Non-entry lines (prose, blanks, headings) are preserved, as are the
 /// file's original line terminators (`\n` or `\r\n`).
-pub fn cmd_update(
-    base: &Path,
-    section: &str,
-    id: &str,
-    new_text: &str,
-) -> Result<Entry> {
+pub fn cmd_update(base: &Path, section: &str, id: &str, new_text: &str) -> Result<Entry> {
+    let path = prepare_update_path(base, section, new_text)?;
+    cmd_update_prevalidated(&path, id, new_text)
+}
+
+/// Validate the cheap, CPU-only `update` inputs and return the canonical
+/// devlog path.  Existence/read/parse/rewrite remain in the blocking
+/// section because they touch the filesystem.
+pub fn prepare_update_path(base: &Path, section: &str, new_text: &str) -> Result<PathBuf> {
     validate_entry_text(new_text)?;
-    let path = resolve_path(base, section)?;
+    resolve_path(base, section)
+}
+
+/// Update an entry after `section` and replacement text have already
+/// been validated.  This is the blocking file-work part of [`cmd_update`].
+pub fn cmd_update_prevalidated(path: &Path, id: &str, new_text: &str) -> Result<Entry> {
     if !path.exists() {
         bail!("devlog not found: {}", path.display());
     }
-    let _lock = acquire_lock_for(&path)?;
+    let _lock = acquire_lock_for(path)?;
 
-    let contents = read_contents(&path)?;
-    let entries = parse_file(&path, &contents)?;
+    let contents = read_contents(path)?;
+    let entries = parse_file(path, &contents)?;
     let target_idx = resolve_target(&entries, id)?;
     let target = entries[target_idx].clone();
 
@@ -199,12 +215,7 @@ pub fn cmd_update(
 /// mid-operation leaves a duplicate, which is visible and fixable, rather
 /// than silently losing the entry).  The returned [`Entry`] reflects the
 /// entry's new number in the destination.
-pub fn cmd_move(
-    base: &Path,
-    from_section: &str,
-    id: &str,
-    to_section: &str,
-) -> Result<Entry> {
+pub fn cmd_move(base: &Path, from_section: &str, id: &str, to_section: &str) -> Result<Entry> {
     validate_section_name(from_section)?;
     validate_section_name(to_section)?;
     if from_section == to_section {
@@ -352,11 +363,7 @@ fn build_contents_with_insert(
 /// Build the source file contents with the entry at `target_idx` removed.
 /// Remaining entries are renumbered 1..N by file-position order (no
 /// gaps).  Prose and line endings are preserved.
-fn build_contents_without_target(
-    contents: &str,
-    entries: &[Entry],
-    target_idx: usize,
-) -> String {
+fn build_contents_without_target(contents: &str, entries: &[Entry], target_idx: usize) -> String {
     let line_ending = detect_line_ending(contents);
     let trailing_newline = contents.ends_with('\n');
 
