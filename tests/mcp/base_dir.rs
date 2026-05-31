@@ -51,7 +51,7 @@ async fn list_reads_from_override_base_dir() {
         .await
         .unwrap();
     assert_ok(&result);
-    let arr = structured(&result).as_array().unwrap();
+    let arr = structured(&result).get("entries").unwrap().as_array().unwrap();
     assert_eq!(arr.len(), 1);
 
     // …but the default-scoped list call does not.
@@ -75,7 +75,7 @@ async fn sections_honours_override_base_dir() {
 
     let default_sections = server.devlog_sections(sections_args()).await.unwrap();
     assert_eq!(
-        structured(&default_sections).as_array().unwrap().len(),
+        structured(&default_sections).get("sections").unwrap().as_array().unwrap().len(),
         0,
         "default base should be empty"
     );
@@ -85,6 +85,8 @@ async fn sections_honours_override_base_dir() {
         .await
         .unwrap();
     let names: Vec<&str> = structured(&overridden)
+        .get("sections")
+        .unwrap()
         .as_array()
         .unwrap()
         .iter()

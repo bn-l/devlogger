@@ -8,7 +8,7 @@ async fn sections_empty_base_returns_empty_array() {
     let result = server.devlog_sections(sections_args()).await.unwrap();
     assert_ok(&result);
 
-    let arr = structured(&result).as_array().unwrap();
+    let arr = structured(&result).get("sections").unwrap().as_array().unwrap();
     assert!(arr.is_empty());
     assert_eq!(text_of(&result), "");
 }
@@ -24,7 +24,7 @@ async fn sections_returns_sorted_unique_names() {
     let result = server.devlog_sections(sections_args()).await.unwrap();
     assert_ok(&result);
 
-    let arr = structured(&result).as_array().unwrap();
+    let arr = structured(&result).get("sections").unwrap().as_array().unwrap();
     let names: Vec<&str> = arr.iter().map(|v| v.as_str().unwrap()).collect();
     assert_eq!(names, vec!["alpha", "mid", "zulu"]);
 }
@@ -50,7 +50,7 @@ async fn sections_ignores_invalidly_named_directories() {
 
     let result = server.devlog_sections(sections_args()).await.unwrap();
     assert_ok(&result);
-    let arr = structured(&result).as_array().unwrap();
+    let arr = structured(&result).get("sections").unwrap().as_array().unwrap();
     let names: Vec<&str> = arr.iter().map(|v| v.as_str().unwrap()).collect();
     assert_eq!(names, vec!["valid"]);
 }
@@ -64,7 +64,7 @@ async fn sections_ignores_section_dirs_without_a_devlog_file() {
     std::fs::create_dir_all(dir.path().join("DEVLOG").join("orphan")).unwrap();
 
     let result = server.devlog_sections(sections_args()).await.unwrap();
-    let arr = structured(&result).as_array().unwrap();
+    let arr = structured(&result).get("sections").unwrap().as_array().unwrap();
     let names: Vec<&str> = arr.iter().map(|v| v.as_str().unwrap()).collect();
     assert_eq!(names, vec!["real"]);
 }

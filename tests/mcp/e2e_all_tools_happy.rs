@@ -48,6 +48,8 @@ async fn devlog_sections_over_wire_round_trips_alphabetical() {
     let result = call_sections(&client).await;
     assert_wire_ok(&result);
     let names: Vec<&str> = structured(&result)
+        .get("sections")
+        .unwrap()
         .as_array()
         .unwrap()
         .iter()
@@ -68,7 +70,11 @@ async fn devlog_list_with_section_over_wire_returns_ordered_entries() {
 
     let result = call_list(&client, Some("seq")).await;
     assert_wire_ok(&result);
-    let arr = structured(&result).as_array().unwrap();
+    let arr = structured(&result)
+        .get("entries")
+        .unwrap()
+        .as_array()
+        .unwrap();
     assert_eq!(arr.len(), 3);
     for (i, v) in arr.iter().enumerate() {
         assert_eq!(
@@ -90,7 +96,11 @@ async fn devlog_list_without_section_over_wire_groups_by_section() {
 
     let result = call_list(&client, None).await;
     assert_wire_ok(&result);
-    let groups = structured(&result).as_array().unwrap();
+    let groups = structured(&result)
+        .get("sections")
+        .unwrap()
+        .as_array()
+        .unwrap();
     assert_eq!(groups.len(), 2);
 
     let alpha = &groups[0];

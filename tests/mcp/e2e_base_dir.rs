@@ -58,7 +58,7 @@ async fn list_override_reads_from_override_directory() {
     )
     .await;
     assert_wire_ok(&result);
-    let arr = structured(&result).as_array().unwrap();
+    let arr = structured(&result).get("entries").unwrap().as_array().unwrap();
     assert_eq!(arr.len(), 1);
 
     // Same call without the override must fail to find the section in
@@ -87,7 +87,7 @@ async fn sections_override_reflects_override_layout() {
 
     // Default sections list is empty.
     let defaults = call_sections(&client).await;
-    assert!(structured(&defaults).as_array().unwrap().is_empty());
+    assert!(structured(&defaults).get("sections").unwrap().as_array().unwrap().is_empty());
 
     let overridden = call(
         &client,
@@ -97,6 +97,8 @@ async fn sections_override_reflects_override_layout() {
     .await;
     assert_wire_ok(&overridden);
     let names: Vec<&str> = structured(&overridden)
+        .get("sections")
+        .unwrap()
         .as_array()
         .unwrap()
         .iter()

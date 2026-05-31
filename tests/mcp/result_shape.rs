@@ -21,18 +21,20 @@ async fn new_result_has_both_text_and_structured() {
 }
 
 #[tokio::test]
-async fn list_single_section_structured_is_array_of_entries() {
+async fn list_single_section_structured_is_object_with_entries() {
     let (server, _dir) = fresh_server();
     server.devlog_new(new_args("core", "x")).await.unwrap();
 
     let result = server.devlog_list(list_args(Some("core"))).await.unwrap();
     let s = structured(&result);
-    assert!(
-        s.is_array(),
-        "single-section list should return a JSON array"
-    );
+    assert!(s.is_object(), "single-section list should return a JSON object");
+    let entries = s
+        .get("entries")
+        .expect("missing `entries` key")
+        .as_array()
+        .expect("entries should be an array");
 
-    let first = &s.as_array().unwrap()[0];
+    let first = &entries[0];
     for field in ["number", "date", "text", "line"] {
         assert!(first.get(field).is_some(), "missing `{field}` in entry");
     }
@@ -46,7 +48,12 @@ async fn list_all_sections_structured_is_grouped() {
 
     let result = server.devlog_list(list_args(None)).await.unwrap();
     let s = structured(&result);
-    let arr = s.as_array().expect("expected top-level array");
+    assert!(s.is_object(), "all-sections list should return a JSON object");
+    let arr = s
+        .get("sections")
+        .expect("missing `sections` key")
+        .as_array()
+        .expect("sections should be an array");
     assert_eq!(arr.len(), 2);
 
     for group in arr {
@@ -64,7 +71,13 @@ async fn sections_structured_is_array_of_strings() {
     server.devlog_new(new_args("beta", "y")).await.unwrap();
 
     let result = server.devlog_sections(sections_args()).await.unwrap();
-    let arr = structured(&result).as_array().unwrap();
+    let s = structured(&result);
+    assert!(s.is_object(), "sections should return a JSON object");
+    let arr = s
+        .get("sections")
+        .expect("missing `sections` key")
+        .as_array()
+        .expect("sections should be an array");
     for v in arr {
         assert!(v.is_string(), "every element should be a string");
     }
@@ -89,6 +102,53 @@ async fn tool_errors_flip_is_error_and_still_carry_content() {
     assert!(!result.content.is_empty(), "error must carry a message");
     let msg = text_of(&result);
     assert!(!msg.is_empty());
+}
+
+#[tokio::test]
+async fn structured_content_is_never_a_bare_array() {
+    let (server, _dir) = fresh_server();
+    server.devlog_new(new_args("alpha", "x")).await.unwrap();
+    server.devlog_new(new_args("beta", "y")).await.unwrap();
+
+    let cases: Vec<(&str, serde_json::Value)> = vec![
+        (
+            "devlog_new",
+            structured(&server.devlog_new(new_args("gamma", "z")).await.unwrap()).clone(),
+        ),
+        (
+            "devlog_list (single section)",
+            structured(&server.devlog_list(list_args(Some("alpha"))).await.unwrap()).clone(),
+        ),
+        (
+            "devlog_list (all sections)",
+            structured(&server.devlog_list(list_args(None)).await.unwrap()).clone(),
+        ),
+        (
+            "devlog_sections",
+            structured(&server.devlog_sections(sections_args()).await.unwrap()).clone(),
+        ),
+        (
+            "devlog_read",
+            structured(&server.devlog_read(read_args("alpha", None)).await.unwrap()).clone(),
+        ),
+        (
+            "devlog_update",
+            structured(
+                &server
+                    .devlog_update(update_args("alpha", "1", "edited"))
+                    .await
+                    .unwrap(),
+            )
+            .clone(),
+        ),
+    ];
+
+    for (label, value) in &cases {
+        assert!(
+            value.is_object(),
+            "{label}: structured_content must be a JSON object, got {value}",
+        );
+    }
 }
 
 #[tokio::test]

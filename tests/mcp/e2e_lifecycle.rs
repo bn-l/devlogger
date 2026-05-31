@@ -42,12 +42,16 @@ async fn two_independent_server_processes_do_not_share_state() {
 
     // Each sees only its own section.
     let sections_a: Vec<String> = structured(&call_sections(&client_a).await)
+        .get("sections")
+        .unwrap()
         .as_array()
         .unwrap()
         .iter()
         .map(|v| v.as_str().unwrap().to_string())
         .collect();
     let sections_b: Vec<String> = structured(&call_sections(&client_b).await)
+        .get("sections")
+        .unwrap()
         .as_array()
         .unwrap()
         .iter()
@@ -79,7 +83,7 @@ async fn session_survives_sustained_tool_call_volume() {
     }
 
     let listed = call_list(&client, Some("load")).await;
-    assert_eq!(structured(&listed).as_array().unwrap().len(), 50);
+    assert_eq!(structured(&listed).get("entries").unwrap().as_array().unwrap().len(), 50);
 
     client.cancel().await.ok();
 }
@@ -105,7 +109,7 @@ async fn server_handles_rapid_sequential_calls_without_stalling() {
 
     // Confirm all entries persisted correctly.
     let listed = call_list(&client, Some("rapid")).await;
-    assert_eq!(structured(&listed).as_array().unwrap().len(), 20);
+    assert_eq!(structured(&listed).get("entries").unwrap().as_array().unwrap().len(), 20);
     client.cancel().await.ok();
 }
 
@@ -128,7 +132,7 @@ async fn server_survives_error_call_followed_by_valid_call() {
     assert_wire_ok(&call_new(&client, "core", "still alive").await);
 
     let listed = call_list(&client, Some("core")).await;
-    assert_eq!(structured(&listed).as_array().unwrap().len(), 2);
+    assert_eq!(structured(&listed).get("entries").unwrap().as_array().unwrap().len(), 2);
     client.cancel().await.ok();
 }
 

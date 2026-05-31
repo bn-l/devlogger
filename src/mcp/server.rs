@@ -234,7 +234,9 @@ impl DevlogServer {
                 match result {
                     Ok(entries) => {
                         log_tool_call("devlog_list", started.elapsed(), ResultClass::Success);
-                        let json = entries_to_json(&entries);
+                        let json = serde_json::json!({
+                            "entries": entries_to_json(&entries),
+                        });
                         let summary = entries
                             .iter()
                             .map(|e| e.to_line())
@@ -259,20 +261,20 @@ impl DevlogServer {
                 match result {
                     Ok(groups) => {
                         log_tool_call("devlog_list", started.elapsed(), ResultClass::Success);
-                        let json: Vec<SectionEntriesJson> = groups
+                        let sections: Vec<SectionEntriesJson> = groups
                             .iter()
                             .map(|(name, entries)| SectionEntriesJson {
                                 section: name.clone(),
                                 entries: entries_to_json(entries),
                             })
                             .collect();
+                        let json = serde_json::json!({ "sections": sections });
                         let mut summary = String::new();
                         for (name, entries) in &groups {
                             for e in entries {
                                 summary.push_str(&format!("[{name}] {}\n", e.to_line()));
                             }
                         }
-                        // Trim the trailing newline for a tidier text view.
                         if summary.ends_with('\n') {
                             summary.pop();
                         }
@@ -317,7 +319,8 @@ impl DevlogServer {
             Ok(names) => {
                 log_tool_call("devlog_sections", started.elapsed(), ResultClass::Success);
                 let text = names.join("\n");
-                success_with_json(vec![Content::text(text)], &names)
+                let json = serde_json::json!({ "sections": names });
+                success_with_json(vec![Content::text(text)], &json)
             }
             Err(e) => {
                 log_tool_call("devlog_sections", started.elapsed(), ResultClass::ToolError);

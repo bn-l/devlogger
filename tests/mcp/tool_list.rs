@@ -16,6 +16,8 @@ async fn list_single_section_returns_entries_in_order() {
     assert_ok(&result);
 
     let s = structured(&result)
+        .get("entries")
+        .expect("missing `entries` key")
         .as_array()
         .expect("expected array")
         .clone();
@@ -45,7 +47,11 @@ async fn list_without_section_and_no_sections_returns_empty_array() {
     let result = server.devlog_list(list_args(None)).await.unwrap();
     assert_ok(&result);
 
-    let arr = structured(&result).as_array().unwrap();
+    let arr = structured(&result)
+        .get("sections")
+        .expect("missing `sections` key")
+        .as_array()
+        .unwrap();
     assert!(arr.is_empty(), "expected empty, got {arr:?}");
     assert_eq!(text_of(&result), "");
 }
@@ -62,7 +68,11 @@ async fn list_without_section_groups_by_section_alphabetically() {
     let result = server.devlog_list(list_args(None)).await.unwrap();
     assert_ok(&result);
 
-    let groups = structured(&result).as_array().unwrap();
+    let groups = structured(&result)
+        .get("sections")
+        .expect("missing `sections` key")
+        .as_array()
+        .unwrap();
     let names: Vec<&str> = groups
         .iter()
         .map(|g| g.get("section").and_then(|v| v.as_str()).unwrap())

@@ -36,7 +36,7 @@ async fn many_entries_round_trip_over_wire() {
 
     let listed = call_list(&client, Some("bulk")).await;
     assert_wire_ok(&listed);
-    let arr = structured(&listed).as_array().unwrap();
+    let arr = structured(&listed).get("entries").unwrap().as_array().unwrap();
     assert_eq!(arr.len() as u32, N);
     assert_eq!(
         arr.first().unwrap().get("number").and_then(|v| v.as_u64()),
@@ -111,7 +111,7 @@ async fn multibyte_unicode_text_round_trips_intact() {
 
     let listed = call_list(&client, Some("uni")).await;
     assert_wire_ok(&listed);
-    let arr = structured(&listed).as_array().unwrap();
+    let arr = structured(&listed).get("entries").unwrap().as_array().unwrap();
     assert_eq!(arr.len(), 1);
     assert_eq!(
         arr[0].get("text").and_then(|v| v.as_str()),
@@ -138,6 +138,8 @@ async fn long_section_name_writes_and_reads_back() {
     let sections = call_sections(&client).await;
     assert_wire_ok(&sections);
     let names: Vec<&str> = structured(&sections)
+        .get("sections")
+        .unwrap()
         .as_array()
         .unwrap()
         .iter()

@@ -56,6 +56,8 @@ async fn inprocess_full_tool_round_trip() {
     let sections = call_sections(&client).await;
     assert_wire_ok(&sections);
     let names: Vec<&str> = structured(&sections)
+        .get("sections")
+        .unwrap()
         .as_array()
         .unwrap()
         .iter()
@@ -66,7 +68,7 @@ async fn inprocess_full_tool_round_trip() {
     // list with section
     let listed = call_list(&client, Some("dup")).await;
     assert_wire_ok(&listed);
-    assert_eq!(structured(&listed).as_array().unwrap().len(), 1);
+    assert_eq!(structured(&listed).get("entries").unwrap().as_array().unwrap().len(), 1);
 
     // update
     let updated = call_update(&client, "dup", "1", "second").await;
@@ -99,12 +101,16 @@ async fn inprocess_two_clients_with_separate_base_dirs_do_not_cross_contaminate(
     assert_wire_ok(&call_new(&client_b, "right", "in-b").await);
 
     let sections_a: Vec<String> = structured(&call_sections(&client_a).await)
+        .get("sections")
+        .unwrap()
         .as_array()
         .unwrap()
         .iter()
         .map(|v| v.as_str().unwrap().to_string())
         .collect();
     let sections_b: Vec<String> = structured(&call_sections(&client_b).await)
+        .get("sections")
+        .unwrap()
         .as_array()
         .unwrap()
         .iter()
